@@ -1,0 +1,27 @@
+# N150 Market Registry
+# Each market instance is deployed independently with its own SHM, config, and log directory.
+# The git repo is a shared read-only source; each market symlinks its config.
+
+n150:
+  host: 192.168.1.103
+  user: jerry
+  base_dir: /home/jerry/qts_v8
+
+markets:
+  btc_5m:
+    enabled: true
+    port: 9101             # Metrics port
+    shm: /dev/shm/qts_btc5m
+    log_dir: /home/jerry/qts_v8/markets/btc_5m/logs
+
+  eth_5m:
+    enabled: false         # Start after ETH re-integration
+    port: 9102
+    shm: /dev/shm/qts_eth5m
+    log_dir: /home/jerry/qts_v8/markets/eth_5m/logs
+
+  sol_5m:
+    enabled: false         # Future
+    port: 9103
+    shm: /dev/shm/qts_sol5m
+    log_dir: /home/jerry/qts_v8/markets/sol_5m/logs

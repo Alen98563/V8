@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QTS V8 · Qwen 3.7 Max · Python 执行计划</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#05080e;--bg1:#070c1a;--bg2:#0a1222;--bg3:#0e192e;
+  --bdr:#162038;--bdr2:#1e2e4a;--bdr3:#273c60;
+  --tx1:#eef2f8;--tx2:#8ba3c4;--tx3:#3d5070;
+  --py:#38bdf8;--py-d:#0369a1;--py-bg:#020d18;--py-lt:#bae6fd;
+  --grn:#4ade80;--grn-bg:#06160d;--grn-d:#166534;
+  --ylw:#fbbf24;--ylw-bg:#160e00;--ylw-d:#92400e;
+  --red:#f87171;--red-bg:#150404;--red-d:#991b1b;
+  --proto:#2dd4bf;--proto-bg:#021a18;--proto-lt:#99f6e4;
+  --accent:#818cf8;--rust:#c084fc;--rust-bg:#0d0318;--rust-lt:#e9d5ff;
+  --cpp:#fb923c;--cpp-bg:#1a0800;--cpp-d:#c2410c;
+}
+body{background:var(--bg0);color:var(--tx1);font-family:'SF Pro Text',-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;line-height:1.65}
+nav{position:sticky;top:0;z-index:100;background:rgba(5,8,14,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 18px;min-height:46px;gap:2px;overflow-x:auto}
+.logo{font-size:11px;font-weight:800;letter-spacing:.1em;padding-right:14px;margin-right:6px;border-right:1px solid var(--bdr);white-space:nowrap;background:linear-gradient(90deg,var(--py),var(--proto));-webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0}
+.nt{padding:10px 11px;font-size:11px;font-weight:500;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.nt:hover{color:var(--tx2)}.nt.on{color:var(--tx1);border-color:var(--py)}
+.pg{display:none;max-width:1080px;margin:0 auto;padding:20px 18px 72px}.pg.on{display:block}
+
+.hero{border:1px solid #0c3054;border-radius:16px;padding:26px 30px;margin-bottom:16px;background:linear-gradient(140deg,#020d18 0%,#05080e 60%)}
+.hero h1{font-size:22px;font-weight:700;margin-bottom:6px;background:linear-gradient(90deg,var(--py),var(--proto));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:12px;color:var(--tx2);line-height:1.85}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.tag{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600}
+.t-p{background:var(--py-bg);color:var(--py-lt);border:1px solid var(--py-d)}
+.t-g{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-d)}
+.t-a{background:var(--proto-bg);color:var(--proto-lt);border:1px solid var(--proto)}
+.t-c{background:var(--cpp-bg);color:var(--cpp);border:1px solid var(--cpp-d)}
+.t-r{background:var(--rust-bg);color:var(--rust-lt);border:1px solid var(--rust)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:7px;margin-bottom:16px}
+.stat{background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:10px;text-align:center}
+.sv{font-size:17px;font-weight:700;font-family:monospace;margin-bottom:2px}
+.sl{font-size:9px;color:var(--tx3)}
+
+.ctx{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.ctx-h{font-size:11px;font-weight:700;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.ctx-h::before{content:'';width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,var(--py),var(--proto));display:inline-block}
+
+.sec{margin-bottom:20px}
+.sh{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:7px}
+.sh::before{content:'';width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,var(--py),var(--proto));display:inline-block}
+
+.task{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.task-head{padding:13px 16px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;user-select:none}
+.t-num{flex-shrink:0;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--py-bg);color:var(--py-lt);border:1px solid var(--py-d)}
+.t-meta{flex:1}
+.t-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.t-sub{font-size:11px;color:var(--tx2)}
+.t-phase{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--bdr3);color:var(--tx3);white-space:nowrap;flex-shrink:0}
+.t-toggle{font-size:14px;color:var(--tx3);transition:.2s;flex-shrink:0;margin-top:8px}
+.task-body{padding:0 16px 14px;display:none}
+.task-body.open{display:block}
+
+.ftable{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0 12px}
+.ftable th{padding:5px 9px;border-bottom:1px solid var(--bdr2);font-size:10px;font-weight:600;color:var(--tx3);letter-spacing:.04em;text-align:left}
+.ftable td{padding:6px 9px;border-bottom:1px solid #080d18;vertical-align:top;line-height:1.55}
+.ftable tr:last-child td{border-bottom:none}
+.ftable tr:hover td{background:#070c18}
+.fn{font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:600;color:var(--py-lt)}
+.fn-r{color:var(--rust-lt)}.fn-t{color:var(--proto-lt)}.fn-g{color:var(--grn)}
+.lb{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px}
+.lb-p{background:var(--py-bg);color:var(--py-lt)}.lb-r{background:var(--rust-bg);color:var(--rust-lt)}
+.lb-g{background:var(--grn-bg);color:var(--grn)}.lb-y{background:var(--ylw-bg);color:var(--ylw)}
+.lb-c{background:var(--cpp-bg);color:var(--cpp)}
+
+.note{border-radius:8px;padding:10px 13px;margin:8px 0;font-size:11px;line-height:1.7}
+.n-p{background:var(--py-bg);border:1px solid var(--py-d)}.n-p .nt2{color:var(--py-lt)}
+.n-g{background:var(--grn-bg);border:1px solid var(--grn-d)}.n-g .nt2{color:var(--grn)}
+.n-y{background:var(--ylw-bg);border:1px solid var(--ylw-d)}.n-y .nt2{color:var(--ylw)}
+.n-r{background:var(--rust-bg);border:1px solid var(--rust)}.n-r .nt2{color:var(--rust-lt)}
+.n-a{background:var(--proto-bg);border:1px solid var(--proto)}.n-a .nt2{color:var(--proto-lt)}
+.n-c{background:var(--cpp-bg);border:1px solid var(--cpp-d)}.n-c .nt2{color:var(--cpp)}
+.nt2{font-weight:700;margin-bottom:3px}
+
+pre{background:#030508;border:1px solid var(--bdr2);border-radius:8px;padding:12px 15px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:10.5px;line-height:1.75;overflow-x:auto;margin:8px 0 12px}
+.ck{color:#818cf8}.cv{color:#f472b6}.cs{color:#34d399}.cc{color:#2d3f55;font-style:italic}.co{color:#fb923c}.ca{color:var(--rust-lt)}.cx{color:var(--proto-lt)}
+
+.ar-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ar-box{border-radius:7px;padding:9px 12px;font-size:10px;line-height:1.7}
+.ar-ok{background:#04100a;border:1px solid #166534}.ar-ok .ar-t{color:#86efac;font-weight:700;margin-bottom:3px}
+.ar-rb{background:var(--red-bg);border:1px solid var(--red-d)}.ar-rb .ar-t{color:#fca5a5;font-weight:700;margin-bottom:3px}
+.ar-if{background:#050d1c;border:1px solid var(--bdr3)}.ar-if .ar-t{color:var(--accent);font-weight:700;margin-bottom:3px}
+.ar-body{color:var(--tx2)}
+
+.iface{background:#030910;border:1px solid var(--bdr3);border-radius:8px;padding:11px 14px;margin:8px 0}
+.iface-t{font-size:10px;font-weight:700;color:var(--py-lt);margin-bottom:6px;letter-spacing:.04em}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+@media(max-width:660px){.g2,.ar-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">QWEN · PYTHON · PLAN</div>
+  <span class="nt on" onclick="sw('ctx')">📖 背景与职责</span>
+  <span class="nt" onclick="sw('tasks')">📋 任务清单</span>
+  <span class="nt" onclick="sw('iface')">🔌 接口契约</span>
+  <span class="nt" onclick="sw('collab')">🤝 与DeepSeek协作</span>
+  <span class="nt" onclick="sw('rules')">⚠️ 执行规则</span>
+</nav>
+
+<!-- ══ 背景 ══ -->
+<div id="pg-ctx" class="pg on">
+<div class="hero">
+  <h1>Qwen 3.7 Max · Python AI/策略层执行计划</h1>
+  <div class="hero-sub">
+    你负责 QTS V8 系统的 AI 推断、量化策略、门控风控与系统编排，是整个系统的"大脑"层。<br>
+    另一位 AI（DeepSeek V4 Pro）负责 Rust 底层热路径，双方代码最终合并为同一个运行系统。<br>
+    本文档包含你需要了解的全部背景、所有任务、你能调用的 Rust 接口契约、与 DeepSeek 的协作边界。
+  </div>
+  <div class="tags">
+    <span class="tag t-p">Python 3.12</span>
+    <span class="tag t-p">PyTorch 2.3 + CUDA 12.4</span>
+    <span class="tag t-c">Triton gRPC</span>
+    <span class="tag t-a">Protobuf (grpcio)</span>
+    <span class="tag t-g">OKX Demo → 实盘</span>
+    <span class="tag t-p">LightGBM · asyncpg</span>
+    <span class="tag t-r">调用 v8_core_engine.so</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="sv" style="color:var(--py)">15+</div><div class="sl">Python 文件</div></div>
+  <div class="stat"><div class="sv" style="color:var(--proto)">&lt;3ms</div><div class="sl">Triton gRPC 目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--grn)">5K+</div><div class="sl">CFL 标签目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--ylw)">&gt;0.05</div><div class="sl">AlphaCast IC</div></div>
+  <div class="stat"><div class="sv" style="color:var(--accent)">Phase 0–5</div><div class="sl">你的全周期</div></div>
+  <div class="stat"><div class="sv" style="color:var(--cpp)">分钟级</div><div class="sl">在线微调响应</div></div>
+</div>
+
+<div class="sec">
+  <div class="sh">系统全貌：你在整体中的位置</div>
+  <div class="ctx">
+    <div class="ctx-h">QTS V8 系统是什么</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      QTS V8 是针对 OKX ETH-USDT 永续合约（5分钟周期）的量化交易系统。<strong style="color:var(--tx1)">Rust + Python 混合双核架构</strong>：<br><br>
+      • <strong style="color:var(--rust-lt)">Rust 侧（DeepSeek 负责）</strong>：WebSocket 数据接收、共享内存缓冲、特征计算、OKX 签名下单、订单状态机、MCTS 树搜索核心。所有延迟 &lt;1μs 的操作。<br>
+      • <strong style="color:var(--py-lt)">Python 侧（你负责）</strong>：AI 模型推断（ResNet/AlphaCast via Triton）、量化策略（OBI_v2/资金费率套利）、门控风控（G1–G4）、Harness 编排、标签积累、监控告警、在线微调。<br><br>
+      你通过 <code style="color:var(--rust-lt)">import v8_core_engine as vce</code> 调用 DeepSeek 实现的 Rust 模块。数据从 <strong style="color:var(--proto-lt)">Rust SHM（共享内存）</strong> 零拷贝传入你的 PyTorch 模型，延迟 &lt;1μs。你的信号通过 <strong style="color:var(--proto-lt)">Redis 温路径</strong> 传递给 Rust 执行层。
+    </div>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">开发阶段与你的交付时序</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      <strong style="color:var(--proto-lt)">Phase 0（Week 1）</strong>：你交付：Python 环境搭建、Protobuf Python 代码生成、Docker Compose（Redis + TimescaleDB）、基础监控面板骨架。可与 DeepSeek 并行。<br><br>
+      <strong style="color:var(--grn)">Phase 1（Week 2–3）</strong>：你交付：shm_bridge.py（依赖 DeepSeek T1-1 完成）、Alpha 引擎（obi_v2.py/funding_rate_arb.py）、hard_gating.py（G1/G2/G5）、pipeline_v1.py、logging_handler.py、pnl_aggregator.py。<strong style="color:var(--ylw)">注意：shm_bridge.py 必须等 DeepSeek 的 buffer.rs 完成才能联调。</strong><br><br>
+      <strong style="color:var(--ylw)">Phase 2（Week 4–5）</strong>：你交付：ResNet 编码器、特征融合、CFL 标签工厂（写 TimescaleDB）、G3 时序百分位门。<br><br>
+      <strong style="color:var(--rust)">Phase 3（Week 6）</strong>：你交付：LightGBM 替身模型→Triton 部署→AlphaCast 正式接入→G4 MetaLabeler。最复杂的 AI 链路。<br><br>
+      <strong style="color:var(--red)">Phase 4（Week 7）</strong>：你交付：mcts_worker.py（调用 DeepSeek T4-1 的 MctsPool）、pipeline_v2.py 全链路串联。<br><br>
+      <strong style="color:var(--cpp)">Phase 5（Week 8–9）</strong>：你交付：在线微调（alphacast_online_update.py）、P&L 追踪、全链路压测、实盘切换。
+    </div>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">你不需要做什么（DeepSeek 的领域）</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      ✗ 任何 .rs 文件——不要修改 Rust 代码<br>
+      ✗ OKX WebSocket 的原始 TCP 连接和心跳管理——DeepSeek 负责<br>
+      ✗ HMAC-SHA256 签名逻辑——DeepSeek 负责（你只需把 UnifiedOrder proto bytes 传给 OkxChannel.place_order()）<br>
+      ✗ SHM 内存分配和生命周期管理——DeepSeek 负责（你只用 shm_bridge.py 的只读接口）<br>
+      ✗ 订单状态机内部实现——DeepSeek 负责（你从 Redis Stream pnl:events 消费结果即可）
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 任务 ══ -->
+<div id="pg-tasks" class="pg">
+
+<div class="sec">
+  <div class="sh">Phase 0 · Week 1 · 基建（与 DeepSeek 并行）</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T0-1</div>
+      <div class="t-meta">
+        <div class="t-title">Python 环境 + Protobuf 代码生成 + Docker Compose</div>
+        <div class="t-sub">uv/poetry · grpcio-tools · Redis 7.x · TimescaleDB 2.x · 基础监控骨架</div>
+      </div>
+      <span class="t-phase">Phase 0 · Day 1</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body open">
+      <div class="note n-p"><div class="nt2">任务说明</div>搭建 Python 侧的完整开发环境。与 DeepSeek 同时启动，不相互阻塞。</div>
+      <table class="ftable">
+        <tr><th>交付文件</th><th>关键内容</th></tr>
+        <tr><td class="fn">qts_python/pyproject.toml</td><td style="font-size:10px;color:var(--tx2)">依赖锁定：torch==2.3.*, grpcio-tools==1.62.*, tritonclient[grpc]==2.43.*, lightgbm==4.3.*, polars==0.20.*, asyncpg==0.29.*, redis==5.0.*, fastapi==0.111.*, loguru, scipy</td></tr>
+        <tr><td class="fn">schemas/gen_python.sh</td><td style="font-size:10px;color:var(--tx2)">python -m grpc_tools.protoc --python_out=. --pyi_out=. -I ../schemas ../schemas/*.proto。生成 market_snapshot_pb2.py、unified_order_pb2.py 等。</td></tr>
+        <tr><td class="fn">docker-compose.yml</td><td style="font-size:10px;color:var(--tx2)">Redis 7.2-alpine (maxmemory 16gb, AOF everysec)；TimescaleDB 2.14-pg16（建立 cfl_labels 超表：ts TIMESTAMPTZ, trace_id TEXT, features BYTEA, label_5m FLOAT, label_30m FLOAT, label_2h FLOAT, alphacast_conf FLOAT DEFAULT 0, mcts_value FLOAT DEFAULT 0）</td></tr>
+        <tr><td class="fn">monitor/dashboard.py</td><td style="font-size:10px;color:var(--tx2)">FastAPI + WebSocket，轮询 Redis okx:snapshot:latest，展示 WS 延迟、Tick 速率、连接状态。Phase 1 起逐步丰富指标。</td></tr>
+      </table>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">uv sync 零报错；Protobuf 生成代码无语法错误；docker-compose up -d 全服务 healthy；TimescaleDB cfl_labels 超表创建成功；dashboard.py 能启动并显示页面</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 交付给 DeepSeek</div><div class="ar-body">schemas/*.proto 最终确认版本（双方共同 review 后锁定）；docker-compose.yml 中 Redis 端口和 TimescaleDB 连接信息（DeepSeek 的 Rust 代码需要连接 Redis）</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 1 · Week 2–3 · MVP 策略与编排闭环</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-1</div>
+      <div class="t-meta">
+        <div class="t-title">SHM 零拷贝桥接 (data/shm_bridge.py) — 等待 DeepSeek T1-1</div>
+        <div class="t-sub">torch.from_dlpack · np.frombuffer · 读取延迟 &lt;1μs 验证</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2（DeepSeek buffer.rs 完成后）</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body open">
+      <div class="note n-y"><div class="nt2">前置条件</div>必须等 DeepSeek 完成 buffer.rs（T1-1）并编译出新的 .so 后才能联调。在等待期间，可以先写好代码框架，用 mock 的 np.zeros([60,50]) 替代真实 SHM 数据，让下游 Alpha 引擎可以并行开发。</div>
+      <pre><span class="cc"># data/shm_bridge.py</span>
+<span class="ck">import</span> v8_core_engine <span class="ck">as</span> vce
+<span class="ck">import</span> torch, numpy <span class="ck">as</span> np
+
+<span class="ck">class</span> <span class="ca">ShmBridge</span>:
+    <span class="ck">def</span> <span class="cv">__init__</span>(self, mock_mode: bool = <span class="ck">False</span>):
+        self.mock_mode = mock_mode
+        <span class="ck">if not</span> mock_mode:
+            self._bridge = vce.ShmBridge()  <span class="cc"># 连接 /dev/shm/qts_eth5m</span>
+
+    <span class="ck">def</span> <span class="cv">get_feature_tensor</span>(self, window_secs: int = <span class="co">60</span>) -> torch.Tensor:
+        <span class="ck">if</span> self.mock_mode:
+            <span class="ck">return</span> torch.randn(<span class="co">12</span>, <span class="co">50</span>)  <span class="cc"># 等待 DeepSeek 期间的占位</span>
+        dlpack = self._bridge.get_window(secs=window_secs)
+        <span class="ck">return</span> torch.from_dlpack(dlpack)  <span class="cc"># 零拷贝，不发生内存复制</span>
+
+    <span class="ck">def</span> <span class="cv">get_numpy_view</span>(self, window_secs: int = <span class="co">30</span>) -> np.ndarray:
+        <span class="ck">if</span> self.mock_mode:
+            <span class="ck">return</span> np.zeros((<span class="co">6</span>, <span class="co">50</span>), dtype=np.float32)
+        ptr, shape = self._bridge.get_raw_ptr(secs=window_secs)
+        <span class="ck">return</span> np.frombuffer(ptr, dtype=np.float32).reshape(shape)</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">真实 SHM 读取延迟 &lt;1μs (timeit 100次均值)；get_feature_tensor 返回 shape [T, 50] float32；mock_mode=True 时 Alpha 引擎可正常运行（保证并行开发不阻塞）</div></div>
+        <div class="ar-box ar-rb"><div class="ar-t">⚠️ 不要做</div><div class="ar-body">不要在 shm_bridge.py 中直接 open('/dev/shm/qts_eth5m')——必须通过 vce.ShmBridge() 接口，否则会绕过 Rust 的 RwLock 保护，导致内存竞争</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-2</div>
+      <div class="t-meta">
+        <div class="t-title">经验 Alpha 引擎 (alpha/crypto/)</div>
+        <div class="t-sub">OBI_v2 · 资金费率套利 · AlphaSignal 数据结构 · trace_id 生成</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2（可并行，用 mock SHM）</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-p"><div class="nt2">任务说明</div>实现两个基础 Alpha 引擎，从 SHM 特征中生成交易信号。可先用 mock_mode=True 的 ShmBridge 并行开发，DeepSeek 的 .so 就绪后切换为真实数据。</div>
+      <table class="ftable">
+        <tr><th>文件</th><th>策略逻辑</th><th>信号频率</th></tr>
+        <tr>
+          <td class="fn">alpha/crypto/obi_v2.py</td>
+          <td style="font-size:10px;color:var(--tx2)">买入条件：OBI（特征第6维）&gt; 0.6 且 mom_5m（特征第11维）&gt; 0 且 Spread_Z &lt; 1.5。卖出条件：OBI &lt; -0.6 且 mom_5m &lt; 0。信号强度 = OBI × abs(mom_5m)，归一化到 [0,1]。</td>
+          <td style="font-size:10px;color:var(--tx2)">~20–40笔/天</td>
+        </tr>
+        <tr>
+          <td class="fn">alpha/crypto/funding_rate_arb.py</td>
+          <td style="font-size:10px;color:var(--tx2)">每 5min 从 Redis 读取 OKX 资金费率（DeepSeek 的 feature_engine.rs 写入 okx:funding_rate:latest）。资金费率 &gt; 0.01%（做空永续对冲）；&lt; -0.01%（做多永续对冲）。结合 5m 动量过滤弱信号。</td>
+          <td style="font-size:10px;color:var(--tx2)">持续套利</td>
+        </tr>
+      </table>
+      <pre><span class="cc"># alpha/base_alpha.py — AlphaSignal 统一格式</span>
+<span class="ck">from</span> dataclasses <span class="ck">import</span> dataclass, field
+<span class="ck">import</span> uuid, time
+
+@dataclass
+<span class="ck">class</span> <span class="ca">AlphaSignal</span>:
+    trace_id: str = field(default_factory=<span class="ck">lambda</span>: str(uuid.uuid4())[:32])
+    symbol: str = <span class="cs">"ETH-USDT-SWAP"</span>
+    side: str = <span class="cs">"buy"</span>          <span class="cc"># buy | sell | close</span>
+    size: float = <span class="co">0.01</span>          <span class="cc"># 合约张数，由 Kelly 调整</span>
+    confidence: float = <span class="co">0.5</span>    <span class="cc"># [0,1]，Phase 3 由 AlphaCast 填充</span>
+    alpha_name: str = <span class="cs">""</span>
+    features_50d: bytes = <span class="cs">b""</span>  <span class="cc"># Protobuf 序列化，用于 CFL 标签</span>
+    ts_ns: int = field(default_factory=<span class="ck">lambda</span>: time.time_ns())</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">每个 AlphaSignal 必须有唯一 trace_id（≤32字符，对应 OKX clOrdId 限制）；mock 数据下两个 Alpha 都能稳定生成信号；features_50d 字段正确序列化（供 CFL 标签工厂使用）</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 告知 DeepSeek</div><div class="ar-body">资金费率字段的 Redis Key 名称（你从 Redis 读取，DeepSeek 写入）：okx:funding_rate:latest，格式：JSON {"rate": 0.0001, "ts": 1234567890}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-3</div>
+      <div class="t-meta">
+        <div class="t-title">硬门控 G1/G2/G5 (gating/hard_gating.py)</div>
+        <div class="t-sub">流动性门 · Regime 门 · 资金费率结算时间门 · 100% 记录拒绝信号</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2–3</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <table class="ftable">
+        <tr><th>门控</th><th>逻辑</th><th>通过率目标</th></tr>
+        <tr><td><span class="lb lb-p">G1 流动性</span></td><td style="font-size:10px;color:var(--tx2)">从 SHM 特征读取 Depth_Imbalance（第8维）和盘口深度（bid1_sz + ask1_sz）。总深度 &lt; $50K 美金等值 → 拒绝。Spread_Z（第7维）&gt; 2.5σ → 拒绝。</td><td>拒绝约 10%</td></tr>
+        <tr><td><span class="lb lb-p">G2 Regime</span></td><td style="font-size:10px;color:var(--tx2)">从 SHM 读取 HV_5m（第37维）和 Hurst（第38维）。HV_5m &gt; 4%（极端行情）→ 拒绝。Hurst &lt; 0.5（无趋势市场）→ 拒绝。参数写在 config/settings.py，热重载无需重编译。</td><td>拒绝约 30%</td></tr>
+        <tr><td><span class="lb lb-g">G5 时间门</span></td><td style="font-size:10px;color:var(--tx2)">OKX 专属。资金费率结算时间 UTC 00:00 / 08:00 / 16:00。结算前 30min 到结算后 5min 内，禁止 buy/sell 开仓（close 平仓不限制）。</td><td>结算期拒绝 100%</td></tr>
+      </table>
+      <div class="note n-p"><div class="nt2">关键：100% 记录所有信号（含被拒绝的）</div>无论门控是否放行，所有 AlphaSignal 必须异步写入 Redis Stream signal:all（TTL 永久），同时入队 TimescaleDB cfl_labels 写入队列。这是 Phase 2 CFL 标签工厂和 Phase 3 MetaLabeler 的数据来源，跳过任何一条都会减慢 5K 标签的积累速度。</div>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">G1/G2/G5 都能正确拒绝设计的极端测试用例；所有被拒绝的信号出现在 Redis signal:all Stream；G5 时间门在 UTC 07:30–08:05 时段正确阻止开仓</div></div>
+        <div class="ar-box ar-rb"><div class="ar-t">⚠️ 不要做</div><div class="ar-body">不要在 hard_gating.py 中直接访问 OKX REST API——资金费率等数据通过 Redis 读取（DeepSeek 写入 / 你的 funding_rate_arb.py 轮询写入）</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-4</div>
+      <div class="t-meta">
+        <div class="t-title">Harness 编排 + 日志 + P&L (harness/)</div>
+        <div class="t-sub">pipeline_v1.py · logging_handler.py · pnl_aggregator.py · Telegram 告警</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 3</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-p"><div class="nt2">pipeline_v1.py 串联逻辑</div>5m 闭合事件（来自 Redis Stream bar:close:events，DeepSeek 的 feature_engine.rs 写入）→ ShmBridge 读取特征 → Alpha 引擎生成信号 → G1/G2/G5 门控 → Kelly 仓位计算 → 序列化为 UnifiedOrder proto → 调用 vce.OkxChannel.place_order(order_bytes) → 等待 pnl:events Stream 回执。</div>
+      <pre><span class="cc"># harness/logging_handler.py — 全链路 trace_id 注入</span>
+<span class="ck">import</span> structlog, uuid
+
+<span class="ck">def</span> <span class="cv">get_logger</span>(trace_id: str | <span class="ck">None</span> = <span class="ck">None</span>):
+    <span class="ck">return</span> structlog.get_logger().bind(
+        trace_id=trace_id <span class="ck">or</span> str(uuid.uuid4())[:32],
+        system=<span class="cs">"qts_v8"</span>,
+        market=<span class="cs">"okx_eth_usdt_swap"</span>
+    )
+
+<span class="cc"># pnl_aggregator.py — 从 DeepSeek 的 Redis Stream 消费成交回执</span>
+<span class="ck">async def</span> <span class="cv">consume_pnl_events</span>(redis_client):
+    <span class="ck">async for</span> msg <span class="ck">in</span> redis_client.xread({<span class="cs">"pnl:events"</span>: <span class="cs">"$"</span>}):
+        <span class="cc"># 格式：{trace_id, ord_id, filled_px, filled_sz, side, ts}</span>
+        pnl = calculate_pnl(msg)
+        update_sharpe(pnl)  <span class="cc"># 实时 Sharpe/Sortino/MaxDD</span></pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ Phase 1 总验收</div><div class="ar-body">OKX Demo 完成 100 次"信号→限价单→Fill→P&L"全链路；trace_id 在日志中全程可追踪；Telegram 告警在 G1/G2 拒绝时发送统计；系统内部延迟（不含 OKX RTT）&lt;50ms；24h 无内存泄漏</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 pnl:events 格式（DeepSeek 写入，你消费）</div><div class="ar-body">字段：trace_id(str)、ord_id(str)、filled_px(float)、filled_sz(float)、side(str)、ts_ns(int)。如发现字段缺失立即告知 DeepSeek。</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 2 · Week 4–5 · ResNet 深度特征 + CFL 标签工厂</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T2-1</div>
+      <div class="t-meta">
+        <div class="t-title">ResNet 编码器 + 特征融合 (models/resnet/)</div>
+        <div class="t-sub">Conv1D 6残差块 · 128d 嵌入 · 50d⊕128d → 178d · ONNX 导出</div>
+      </div>
+      <span class="t-phase">Phase 2 · Week 4</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <pre><span class="cc"># models/resnet/resnet_encoder.py</span>
+<span class="ck">import</span> torch, torch.nn <span class="ck">as</span> nn
+
+<span class="ck">class</span> <span class="ca">ResidualBlock1D</span>(nn.Module):
+    <span class="ck">def</span> <span class="cv">__init__</span>(self, channels: int, kernel_size: int = <span class="co">3</span>):
+        super().__init__()
+        self.conv1 = nn.Conv1d(channels, channels, kernel_size, padding=<span class="cs">'same'</span>)
+        self.bn1 = nn.BatchNorm1d(channels)
+        self.conv2 = nn.Conv1d(channels, channels, kernel_size, padding=<span class="cs">'same'</span>)
+        self.bn2 = nn.BatchNorm1d(channels)
+        self.act = nn.LeakyReLU(<span class="co">0.1</span>)
+
+    <span class="ck">def</span> <span class="cv">forward</span>(self, x):
+        residual = x
+        <span class="ck">return</span> self.act(self.bn2(self.conv2(self.act(self.bn1(self.conv1(x))))) + residual)
+
+<span class="ck">class</span> <span class="ca">ResNetEncoder</span>(nn.Module):
+    <span class="co">"""输入: [B, 50, T]  输出: [B, 128]"""</span>
+    <span class="ck">def</span> <span class="cv">__init__</span>(self):
+        super().__init__()
+        self.stem = nn.Conv1d(<span class="co">50</span>, <span class="co">128</span>, kernel_size=<span class="co">1</span>)
+        self.blocks = nn.Sequential(*[<span class="ca">ResidualBlock1D</span>(<span class="co">128</span>) <span class="ck">for</span> _ <span class="ck">in</span> range(<span class="co">6</span>)])
+        self.pool = nn.AdaptiveAvgPool1d(<span class="co">1</span>)  <span class="cc"># 多尺度感受野</span>
+
+    <span class="ck">def</span> <span class="cv">forward</span>(self, x):  <span class="cc"># x: [B, 50, T]</span>
+        <span class="ck">return</span> self.pool(self.blocks(self.stem(x))).squeeze(-<span class="co">1</span>)  <span class="cc"># [B, 128]</span>
+
+<span class="cc"># 导出 ONNX（放入 Triton Model Repository）</span>
+<span class="ck">def</span> <span class="cv">export_onnx</span>(model, path=<span class="cs">"triton_model_repository/resnet/1/model.onnx"</span>):
+    dummy = torch.zeros(<span class="co">1</span>, <span class="co">50</span>, <span class="co">60</span>)
+    torch.onnx.export(model, dummy, path,
+        input_names=[<span class="cs">"input_features"</span>], output_names=[<span class="cs">"embedding_128d"</span>],
+        dynamic_axes={<span class="cs">"input_features"</span>: {<span class="co">0</span>: <span class="cs">"batch"</span>, <span class="co">2</span>: <span class="cs">"time"</span>}})</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">输出 128d 向量，余弦相似度基线（vs 随机初始化）&gt;0.85（离线训练前用历史数据验证数值范围合理）；ONNX 导出成功；ONNXRuntime 本地推断 &lt;5ms</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">输入来源</div><div class="ar-body">ShmBridge.get_feature_tensor(secs=300) → shape [60, 50] → transpose → [50, 60] → unsqueeze(0) → [1, 50, 60]</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T2-2</div>
+      <div class="t-meta">
+        <div class="t-title">CFL 反事实标签工厂 (labeling/counterfactual_labeler.py)</div>
+        <div class="t-sub">100% 信号记录 · asyncpg TimescaleDB · 多窗口标注 · Phase 3 数据基础</div>
+      </div>
+      <span class="t-phase">Phase 2 · Week 4–5</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-p"><div class="nt2">重要性</div>这是整个系统的"飞轮"起点。每少记录一条信号，Phase 3 的 MetaLabeler 就少一条训练数据，5K 标签目标就延迟一步。必须 100% 记录，包括所有被门控拒绝的信号。</div>
+      <pre><span class="cc"># labeling/counterfactual_labeler.py</span>
+<span class="ck">import</span> asyncpg
+
+<span class="ck">async def</span> <span class="cv">record_signal</span>(pool: asyncpg.Pool, signal: <span class="ca">AlphaSignal</span>, gate_result: str):
+    <span class="cc"># gate_result: "passed" | "g1_rejected" | "g2_rejected" | "g5_rejected"</span>
+    <span class="ck">await</span> pool.execute(<span class="cs">"""
+        INSERT INTO cfl_labels
+          (ts, trace_id, features_50d, features_178d, alpha_name,
+           side, confidence, gate_result,
+           alphacast_conf, mcts_value)  -- Phase 3/4 前默认 0
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        ON CONFLICT (trace_id) DO NOTHING
+    """</span>, signal.ts, signal.trace_id, signal.features_50d,
+        signal.features_178d,  <span class="cc"># Phase 2 起填充</span>
+        signal.alpha_name, signal.side, signal.confidence,
+        gate_result, <span class="co">0.0</span>, <span class="co">0.0</span>)
+
+<span class="ck">async def</span> <span class="cv">fill_labels</span>(pool: asyncpg.Pool):
+    <span class="cc"># 定时任务：每 5min 回填已有信号的真实收益（5m/30m/2h 窗口）</span>
+    <span class="cc"># 从 Redis pnl:events 或 OKX K线接口获取后续真实价格，计算标注</span>
+    <span class="ck">await</span> pool.execute(<span class="cs">"""
+        UPDATE cfl_labels SET label_5m = ..., label_30m = ..., label_2h = ...
+        WHERE label_5m IS NULL AND ts < NOW() - INTERVAL '5 minutes'
+    """</span>)</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">TimescaleDB 每天稳定写入 &gt;288 条记录（24h×12条/h）；ON CONFLICT DO NOTHING 防止重复；label_5m 回填延迟 &lt;10min；查询 SELECT COUNT(*) FROM cfl_labels 每天增长 &gt;200</div></div>
+        <div class="ar-box ar-rb"><div class="ar-t">⚠️ 不要漏记</div><div class="ar-body">G1/G2/G5 拒绝的信号一定要记录（gate_result 字段标注拒绝原因），这些"反事实"数据是 MetaLabeler 学习"什么信号该拒绝"的关键训练样本</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 3 · Week 6 · AlphaCast + Triton 全链路</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T3-1</div>
+      <div class="t-meta">
+        <div class="t-title">LightGBM 替身 → Triton → AlphaCast 正式接入</div>
+        <div class="t-sub">先跑通 gRPC 链路 · 再热替换 Transformer · G4 MetaLabeler 条件激活</div>
+      </div>
+      <span class="t-phase">Phase 3 · Week 6</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-p"><div class="nt2">两步走策略</div>第一步：用 LightGBM 训练替身模型，导出 ONNX，部署到 Triton，跑通 gRPC 推断链路（验证基础设施）。第二步：AlphaCast Transformer 训练完成后，只替换 Triton Model Repository 中的模型文件，gRPC 接口和客户端代码零修改。</div>
+      <pre><span class="cc"># models/alphacast/serve_alphacast.py — 统一 Triton gRPC 客户端</span>
+<span class="ck">import</span> tritonclient.grpc <span class="ck">as</span> triton_grpc
+<span class="ck">import</span> numpy <span class="ck">as</span> np
+
+<span class="ck">class</span> <span class="ca">AlphaCastClient</span>:
+    <span class="ck">def</span> <span class="cv">__init__</span>(self, url: str = <span class="cs">"localhost:8001"</span>):
+        self.client = triton_grpc.InferenceServerClient(url=url)
+
+    <span class="ck">async def</span> <span class="cv">predict</span>(self, features_178d: np.ndarray) -> dict:
+        <span class="cc"># features_178d: shape [1, 178]</span>
+        inp = triton_grpc.InferInput(<span class="cs">"INPUT_0"</span>, features_178d.shape, <span class="cs">"FP32"</span>)
+        inp.set_data_from_numpy(features_178d)
+        resp = self.client.infer(model_name=<span class="cs">"alphacast"</span>, inputs=[inp])
+        <span class="ck">return</span> {
+            <span class="cs">"pred_return"</span>: float(resp.as_numpy(<span class="cs">"pred_return"</span>)[<span class="co">0</span>]),
+            <span class="cs">"sigma"</span>:       float(resp.as_numpy(<span class="cs">"sigma"</span>)[<span class="co">0</span>]),
+            <span class="cs">"confidence"</span>:  float(resp.as_numpy(<span class="cs">"confidence"</span>)[<span class="co">0</span>])
+        }
+
+<span class="cc"># alphacast_model.py — Transformer 6L8H（离线训练，GPU 服务器上跑）</span>
+<span class="ck">class</span> <span class="ca">AlphaCastModel</span>(nn.Module):
+    <span class="co">"""输入: [B, 60, 178]  输出: pred_return, sigma, confidence"""</span>
+    <span class="ck">def</span> <span class="cv">__init__</span>(self, d_model=<span class="co">178</span>, nhead=<span class="co">8</span>, num_layers=<span class="co">6</span>):
+        super().__init__()
+        encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, batch_first=<span class="ck">True</span>)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers)
+        self.head_return = nn.Linear(d_model, <span class="co">1</span>)
+        self.head_sigma  = nn.Linear(d_model, <span class="co">1</span>)
+        self.head_conf   = nn.Sequential(nn.Linear(d_model, <span class="co">1</span>), nn.Sigmoid())</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">LightGBM 替身 Triton 推断 &lt;3ms；GPU 利用率 &gt;40%；AlphaCast 离线 IC &gt;0.05；LightGBM→AlphaCast 热替换不中断服务；conf 分布集中在 [0.4, 0.8]</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">Triton 配置要提前准备</div><div class="ar-body">triton_model_repository/alphacast/config.pbtxt：backend="onnxruntime"（LightGBM阶段）→ backend="torchscript"（AlphaCast阶段）；dynamic_batching.preferred_batch_size=[4,8,16]；instance_group.kind=KIND_GPU</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 4 · Week 7 · MCTS Worker 接入</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T4-1</div>
+      <div class="t-meta">
+        <div class="t-title">MCTS Worker (models/mcts/mcts_worker.py)</div>
+        <div class="t-sub">调用 DeepSeek MctsPool · run_in_executor · Rollout 回调 · pipeline_v2</div>
+      </div>
+      <span class="t-phase">Phase 4 · Week 7（等待 DeepSeek T4-1）</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-y"><div class="nt2">asyncio/Tokio 调用规则（必须按此实现）</div>不能在 Python async 函数中直接 await DeepSeek 的 MctsPool.run_sync()。必须通过 asyncio.get_event_loop().run_in_executor(None, pool.run_sync, state_bytes, rollout_fn) 调用。DeepSeek 的 Tokio runtime 在独立 OS 线程中运行，这是唯一安全的调用方式。</div>
+      <pre><span class="cc"># models/mcts/mcts_worker.py</span>
+<span class="ck">import</span> asyncio, v8_core_engine <span class="ck">as</span> vce
+<span class="ck">from</span> models.alphacast.serve_alphacast <span class="ck">import</span> AlphaCastClient
+
+<span class="ck">class</span> <span class="ca">MctsWorker</span>:
+    <span class="ck">def</span> <span class="cv">__init__</span>(self):
+        self.pool = vce.MctsPool(workers=<span class="co">8</span>, timeout_ms=<span class="co">100</span>)
+        self.ac_client = AlphaCastClient()
+
+    <span class="ck">def</span> <span class="cv">_rollout_fn</span>(self, state_bytes: bytes) -> bytes:
+        <span class="cc"># 同步函数，在 Tokio worker 线程内被 Rust 回调</span>
+        <span class="cc"># 必须是同步的，不能是 async def</span>
+        features = deserialize_state(state_bytes)
+        <span class="cc"># 注意：此处不能用 asyncio，直接同步调用 Triton</span>
+        result = self.ac_client.predict_sync(features)  <span class="cc"># 同步版本</span>
+        <span class="ck">return</span> serialize_alphacast_output(result)
+
+    <span class="ck">async def</span> <span class="cv">run_mcts</span>(self, signal: <span class="ca">AlphaSignal</span>) -> dict:
+        state_bytes = serialize_signal_state(signal)
+        loop = asyncio.get_event_loop()
+        <span class="cc"># 通过 executor 隔离 Tokio runtime 和 asyncio</span>
+        result_bytes = <span class="ck">await</span> loop.run_in_executor(
+            <span class="ck">None</span>, self.pool.run_sync, state_bytes, self._rollout_fn
+        )
+        <span class="ck">return</span> deserialize_mcts_result(result_bytes)
+        <span class="cc"># result: {best_action, path_value, sharpe_estimate, simulations_run}</span></pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">run_in_executor 调用无 "cannot run nested event loops" 报错；MCTS 超时（&gt;100ms）自动降级返回 AlphaCast 直接输出；pipeline_v2.py 全链路 &lt;220ms（含 MCTS）；WS 接收线程不被阻塞</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">联调步骤</div><div class="ar-body">①先用 DeepSeek 提供的 mock rollout_fn 验证 MctsPool 调用链路；②验证通过后替换为真实的 self._rollout_fn；③全链路压测 2h 无死锁</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 5 · Week 8–9 · 在线微调 + 实盘</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T5-1</div>
+      <div class="t-meta">
+        <div class="t-title">在线微调 (calibration/alphacast_online_update.py)</div>
+        <div class="t-sub">Temperature Scaling · 每 50 笔触发 · Triton 热切换 · &lt;100ms</div>
+      </div>
+      <span class="t-phase">Phase 5 · Week 8</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <pre><span class="cc"># calibration/alphacast_online_update.py</span>
+<span class="ck">from</span> scipy.optimize <span class="ck">import</span> minimize
+<span class="ck">import</span> numpy <span class="ck">as</span> np
+
+<span class="ck">class</span> <span class="ca">OnlineCalibrator</span>:
+    <span class="ck">def</span> <span class="cv">__init__</span>(self, update_every: int = <span class="co">50</span>):
+        self.T = <span class="co">1.0</span>      <span class="cc"># Temperature Scaling 系数</span>
+        self.T_ema = <span class="co">1.0</span>  <span class="cc"># EMA 平滑版本（α=0.3）</span>
+        self.buffer = []
+        self.n = update_every
+
+    <span class="ck">async def</span> <span class="cv">on_trade_complete</span>(self, trace_id: str, actual_return: float):
+        <span class="cc"># 从 TimescaleDB 查询该 trace_id 的 predicted conf</span>
+        pred_conf = <span class="ck">await</span> self._get_pred_conf(trace_id)
+        self.buffer.append((pred_conf, actual_return > <span class="co">0</span>))  <span class="cc"># 二分类标签</span>
+        <span class="ck">if</span> len(self.buffer) >= self.n:
+            <span class="ck">await</span> self._update()
+            self.buffer.clear()
+
+    <span class="ck">async def</span> <span class="cv">_update</span>(self):
+        confs, outcomes = zip(*self.buffer)
+        <span class="cv">result</span> = minimize(self._nll, [self.T], method=<span class="cs">'L-BFGS-B'</span>,
+                          bounds=[(0.5, 3.0)])  <span class="cc"># T 硬限制 [0.5, 3.0]</span>
+        new_T = result.x[<span class="co">0</span>]
+        <span class="cc"># EMA 平滑，防震荡</span>
+        self.T_ema = <span class="co">0.3</span> * new_T + <span class="co">0.7</span> * self.T_ema
+        <span class="cc"># 连续 3 次反向变化则暂停并告警</span>
+        <span class="ck">if</span> self._is_oscillating():
+            send_telegram_alert(<span class="cs">"⚠️ Temperature Scaling 震荡，暂停更新"</span>)
+            <span class="ck">return</span>
+        self.T = self.T_ema
+        <span class="cc"># Triton 热切换（修改 output calibration layer 权重）</span>
+        <span class="ck">await</span> self._push_to_triton(self.T)  <span class="cc"># &lt;100ms，无停机</span></pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">单次更新 &lt;100ms；ECE（期望校准误差）&lt;0.05；震荡检测正常触发告警；Triton 热切换不中断推断服务；T 始终在 [0.5, 3.0] 范围内</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">数据来源</div><div class="ar-body">成交信号的 actual_return 从 pnl:events Redis Stream 获取；predicted conf 从 cfl_labels TimescaleDB 按 trace_id 查询——DeepSeek 写入 pnl:events，你写入 cfl_labels</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ 接口 ══ -->
+<div id="pg-iface" class="pg">
+<div class="sec">
+  <div class="sh">你可以调用的 Rust 接口（DeepSeek 实现，你只用不改）</div>
+  <div class="note n-r"><div class="nt2">使用原则</div>以下接口由 DeepSeek 实现并编译到 v8_core_engine.so。你只调用，不修改。如果发现接口 bug 或需要新增方法，告知 DeepSeek 修改 Rust 侧，重新编译 .so 后你再更新调用代码。</div>
+  <div class="iface">
+    <div class="iface-t">v8_core_engine 完整接口速查</div>
+    <pre style="margin:0;font-size:10px"><span class="ck">import</span> v8_core_engine <span class="ck">as</span> vce
+
+<span class="cc"># ① SHM 数据读取</span>
+bridge = vce.ShmBridge()
+tensor  = bridge.get_window(secs=<span class="co">60</span>)    <span class="cc"># → DLPack → torch.from_dlpack()</span>
+(ptr, shape) = bridge.get_raw_ptr(<span class="co">30</span>)   <span class="cc"># → np.frombuffer(ptr).reshape(shape)</span>
+snap    = bridge.get_latest()             <span class="cc"># → MarketSnapshot Python 对象</span>
+
+<span class="cc"># ② 特征引擎事件</span>
+engine  = vce.FeatureEngine()
+engine.on_tick(snapshot_bytes)           <span class="cc"># 每 tick，bytes 为 proto 序列化</span>
+event   = engine.on_5m_close()           <span class="cc"># 5m 闭合时调用，返回 BarCloseEvent bytes</span>
+feat    = engine.get_features_50d()      <span class="cc"># 返回当前 50d 特征 bytes</span>
+
+<span class="cc"># ③ OKX 下单（await 调用）</span>
+channel = vce.OkxChannel(api_key, secret, passphrase, is_demo=<span class="ck">True</span>)
+receipt = channel.place_order(order_bytes)   <span class="cc"># UnifiedOrder proto bytes</span>
+ok      = channel.cancel_order(ord_id)
+channel.sync_time()
+
+<span class="cc"># ④ MCTS（Phase 4，run_in_executor 调用，非 await）</span>
+pool    = vce.MctsPool(workers=<span class="co">8</span>, timeout_ms=<span class="co">100</span>)
+result  = pool.run_sync(state_bytes, rollout_fn)  <span class="cc"># 同步调用，在 executor 内</span></pre>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">Redis Key 速查（DeepSeek 写入，你读取）</div>
+    <table class="ftable">
+      <tr><th>Key</th><th>类型</th><th>内容</th><th>你的使用方式</th></tr>
+      <tr><td class="fn fn-t">pnl:events</td><td>Stream</td><td style="font-size:10px;color:var(--tx2)">{trace_id, ord_id, filled_px, filled_sz, side, ts_ns}</td><td style="font-size:10px;color:var(--tx2)">pnl_aggregator.py XREAD 消费；online_update.py 获取 actual_return</td></tr>
+      <tr><td class="fn fn-t">orders:{ordId}</td><td>Hash</td><td style="font-size:10px;color:var(--tx2)">订单完整状态</td><td style="font-size:10px;color:var(--tx2)">dashboard.py 展示持仓状态</td></tr>
+      <tr><td class="fn fn-t">bar:close:events</td><td>Stream</td><td style="font-size:10px;color:var(--tx2)">{ts_ns, inst_id, close_price}</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py XREAD 触发 Alpha 评估</td></tr>
+      <tr><td class="fn fn-t">okx:snapshot:latest</td><td>String</td><td style="font-size:10px;color:var(--tx2)">最新 MarketSnapshot proto bytes</td><td style="font-size:10px;color:var(--tx2)">shm_bridge.py fallback（SHM 读取失败时）</td></tr>
+    </table>
+  </div>
+  <div class="ctx">
+    <div class="ctx-h">你写入 Redis（DeepSeek 读取）</div>
+    <table class="ftable">
+      <tr><th>Key</th><th>内容</th><th>DeepSeek 用途</th></tr>
+      <tr><td class="fn fn-t">okx:funding_rate:latest</td><td style="font-size:10px;color:var(--tx2)">JSON {"rate": float, "ts": int}，由 funding_rate_arb.py 轮询写入</td><td style="font-size:10px;color:var(--tx2)">feature_engine.rs 读取填充第 50 维特征</td></tr>
+      <tr><td class="fn fn-t">signal:passed:{trace_id}</td><td style="font-size:10px;color:var(--tx2)">门控通过的 AlphaSignal proto bytes</td><td style="font-size:10px;color:var(--tx2)">exec_channels.rs 下单前读取 trace_id 和 confidence</td></tr>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ══ 协作 ══ -->
+<div id="pg-collab" class="pg">
+<div class="sec">
+  <div class="sh">与 DeepSeek 的协作时序</div>
+  <table class="ftable">
+    <tr><th>时间节点</th><th>DeepSeek 交付</th><th>你解锁</th><th>联调要点</th></tr>
+    <tr><td style="color:var(--proto-lt)">Week 1 Day 1</td><td style="font-size:10px;color:var(--tx2)">空壳 .so（类名注册）</td><td style="font-size:10px;color:var(--tx2)">验证 import v8_core_engine 不报错，确认类名列表</td><td style="font-size:10px;color:var(--tx2)">确认双方的 .proto 字段编号一致</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 2 Day 3</td><td style="font-size:10px;color:var(--tx2)">buffer.rs → ShmBridge 可用</td><td style="font-size:10px;color:var(--tx2)">shm_bridge.py 真实读取；ResNet 输入验证</td><td style="font-size:10px;color:var(--tx2)">torch.from_dlpack(bridge.get_window(60)) shape = [60, 50]?</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 3 Day 1</td><td style="font-size:10px;color:var(--tx2)">feature_engine.rs + exec_channels.rs</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 接入 5m 闭合事件流；Alpha 触发验证</td><td style="font-size:10px;color:var(--tx2)">bar:close:events Stream 格式；place_order 返回格式</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 3 末</td><td style="font-size:10px;color:var(--tx2)">完整 Phase 1 .so</td><td style="font-size:10px;color:var(--tx2)">OKX Demo 第一笔单，全链路闭环</td><td style="font-size:10px;color:var(--tx2)">pnl:events Stream 字段完整性；trace_id 全程一致</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 4–6</td><td style="font-size:10px;color:var(--tx2)">无新任务（配合调试）</td><td style="font-size:10px;color:var(--tx2)">你独立推进 ResNet/AlphaCast/Triton/CFL 标签</td><td style="font-size:10px;color:var(--tx2)">如有 SHM 接口 bug，告知 DeepSeek 修复并重新编译</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 7</td><td style="font-size:10px;color:var(--tx2)">mcts_core.rs + mock rollout_fn</td><td style="font-size:10px;color:var(--tx2)">mcts_worker.py 联调</td><td style="font-size:10px;color:var(--tx2)">①先用 mock rollout_fn 验证链路；②替换真实 Triton 调用</td></tr>
+  </table>
+  <div class="note n-p"><div class="nt2">在等 DeepSeek 时不要停工</div>Phase 1 期间，在 DeepSeek 的 buffer.rs 未完成时，用 mock_mode=True 的 ShmBridge 开发所有 Alpha 引擎和 Harness 编排。只有 shm_bridge.py 的真实读取部分需要等待，其余代码可以完全并行开发。</div>
+</div>
+</div>
+
+<!-- ══ 规则 ══ -->
+<div id="pg-rules" class="pg">
+<div class="sec">
+  <div class="sh">执行规则与约束</div>
+  <div class="note n-p"><div class="nt2">规则 1：不要修改 Rust 接口签名</div>vce.ShmBridge.get_window()、vce.OkxChannel.place_order() 等接口由 DeepSeek 实现。如果你认为接口需要变更，告知 DeepSeek，双方确认后由 DeepSeek 修改 Rust 代码重新编译 .so，你再更新调用代码。不要绕过接口直接操作 /dev/shm 或 Redis 原始数据结构。</div>
+  <div class="note n-p"><div class="nt2">规则 2：Protobuf 字段编号永不修改</div>schemas/*.proto 的字段编号（= 1, = 2...）在 Phase 0 确定后永不修改。字段名和注释可以加，编号不能动。你的 Python 侧序列化和 DeepSeek 的 Rust 侧反序列化依赖字段编号对齐。</div>
+  <div class="note n-y"><div class="nt2">规则 3：_rollout_fn 必须是同步函数</div>传给 MctsPool.run_sync() 的 rollout_fn 必须是普通同步函数（def，不是 async def）。DeepSeek 的 Tokio worker 在 Python::with_gil() 保护下同步调用它，不支持 asyncio。在 _rollout_fn 内调用 Triton 时使用同步版本的 tritonclient 接口。</div>
+  <div class="note n-y"><div class="nt2">规则 4：SHM 只读，不写</div>你的所有 Python 代码对 SHM 只有读权限。写入 SHM 是 DeepSeek 的 feature_engine.rs 的职责。不要尝试通过 numpy 修改 frombuffer 的返回数组（会触发 Rust RwLock 错误）。</div>
+  <div class="note n-g"><div class="nt2">规则 5：CFL 标签 100% 记录，不能跳过</div>无论信号是否通过门控，counterfactual_labeler.py 必须记录每一条。如果 TimescaleDB 写入失败，先写 Redis backup:cfl:{trace_id}，定时重试写库。标签积累速度直接影响 Phase 3 MetaLabeler 的激活时间。</div>
+  <div class="ctx" style="margin-top:12px">
+    <div class="ctx-h">Python 依赖版本锁定</div>
+    <pre style="margin:0;font-size:10px">torch==2.3.*                 <span class="cc"># CUDA 12.4</span>
+tritonclient[grpc]==2.43.*   <span class="cc"># 与 Triton 2.7.x 对应</span>
+lightgbm==4.3.*
+polars==0.20.*
+asyncpg==0.29.*
+redis==5.0.*
+fastapi==0.111.*
+grpcio-tools==1.62.*
+scipy==1.13.*
+structlog==24.*
+loguru==0.7.*</pre>
+  </div>
+</div>
+</div>
+
+<script>
+function sw(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  const map={ctx:0,tasks:1,iface:2,collab:3,rules:4};
+  document.querySelectorAll('.nt')[map[id]].classList.add('on');
+  window.scrollTo(0,0);
+}
+function toggle(head){
+  const body=head.nextElementSibling;
+  const arrow=head.querySelector('.t-toggle');
+  const open=body.classList.toggle('open');
+  if(arrow)arrow.textContent=open?'▲':'▼';
+}
+</script>
+</body>
+</html>

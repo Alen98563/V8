@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "qts-v8"
+version = "0.1.0"
+description = "QTS V8 — Multi-Asset Hybrid Quant Trading System"
+requires-python = ">=3.12"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "v8_core_engine"
+
+[tool.uv]
+dev-dependencies = [
+    "torch>=2.5",
+    "torchvision>=0.20",
+    "polars>=1.10",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "lightgbm>=4.5",
+    "onnxruntime>=1.19",
+    "tritonclient[grpc]>=2.50",
+    "grpcio-tools>=1.66",
+    "protobuf>=5.28",
+    "redis[hiredis]>=5.2",
+    "asyncpg>=0.30",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.31",
+    "websockets>=13.0",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "structlog>=24.4",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-benchmark>=5.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

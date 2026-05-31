@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QTS V8 · OKX ETH 5m MVP 综合开发计划</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#06080e;--bg1:#090c18;--bg2:#0d1225;--bg3:#111830;--bg4:#151e3a;
+  --bdr:#1a2640;--bdr2:#223055;--bdr3:#2d3f6a;
+  --tx1:#eef2f8;--tx2:#8ba3c4;--tx3:#3d5070;
+  --rust:#c084fc;--rust-d:#7e22ce;--rust-bg:#0d0318;--rust-lt:#e9d5ff;
+  --py:#38bdf8;--py-d:#0369a1;--py-bg:#03111f;--py-lt:#bae6fd;
+  --cpp:#fb923c;--cpp-d:#c2410c;--cpp-bg:#1a0800;--cpp-lt:#fed7aa;
+  --proto:#2dd4bf;--proto-d:#0f766e;--proto-bg:#021a18;--proto-lt:#99f6e4;
+  --grn:#4ade80;--grn-bg:#06160d;--grn-d:#166534;
+  --ylw:#fbbf24;--ylw-bg:#160e00;--ylw-d:#92400e;
+  --red:#f87171;--red-bg:#150404;--red-d:#991b1b;
+  --accent:#818cf8;
+}
+body{background:var(--bg0);color:var(--tx1);font-family:'SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.65;min-height:100vh}
+
+/* ── NAV ── */
+nav{position:sticky;top:0;z-index:100;background:rgba(6,8,14,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 18px;min-height:46px;gap:2px;overflow-x:auto;flex-shrink:0}
+.logo{font-size:11px;font-weight:800;letter-spacing:.12em;padding-right:14px;margin-right:6px;border-right:1px solid var(--bdr);white-space:nowrap;background:linear-gradient(90deg,var(--rust),var(--py),var(--proto));-webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0}
+.nt{padding:10px 11px;font-size:11px;font-weight:500;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s;flex-shrink:0}
+.nt:hover{color:var(--tx2)}.nt.on{color:var(--tx1);border-color:var(--rust)}
+
+/* ── PAGES ── */
+.pg{display:none;max-width:1120px;margin:0 auto;padding:22px 18px 72px}
+.pg.on{display:block}
+
+/* ── HERO ── */
+.hero{border:1px solid #2a0d45;border-radius:16px;padding:28px 32px;margin-bottom:18px;background:linear-gradient(140deg,#0f0320 0%,#06080e 55%)}
+.hero h1{font-size:24px;font-weight:700;letter-spacing:.02em;margin-bottom:6px;background:linear-gradient(95deg,var(--rust),var(--py) 55%,var(--proto));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:12px;color:var(--tx2);line-height:1.85}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.tag{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.03em}
+.t-r{background:var(--rust-bg);color:var(--rust-lt);border:1px solid var(--rust-d)}
+.t-p{background:var(--py-bg);color:var(--py-lt);border:1px solid var(--py-d)}
+.t-c{background:var(--cpp-bg);color:var(--cpp-lt);border:1px solid var(--cpp-d)}
+.t-g{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-d)}
+.t-y{background:var(--ylw-bg);color:var(--ylw);border:1px solid var(--ylw-d)}
+.t-a{background:var(--proto-bg);color:var(--proto-lt);border:1px solid var(--proto-d)}
+
+/* ── STATS ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:7px;margin-bottom:18px}
+.stat{background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:10px 12px;text-align:center}
+.sv{font-size:17px;font-weight:700;font-family:monospace;margin-bottom:2px}
+.sl{font-size:9px;color:var(--tx3);letter-spacing:.02em}
+
+/* ── SECTION ── */
+.sec{margin-bottom:22px}
+.sh{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:7px}
+.sh::before{content:'';display:inline-block;width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--rust),var(--py))}
+
+/* ── PHASE CARD ── */
+.phase{border-radius:13px;overflow:hidden;margin-bottom:10px;border:1px solid var(--bdr2)}
+.ph-head{padding:14px 18px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;user-select:none}
+.ph-badge{flex-shrink:0;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:1.5px solid}
+.ph0{background:#031428;border-color:var(--proto);color:var(--proto-lt)}
+.ph1{background:#0a1f05;border-color:var(--grn);color:#86efac}
+.ph2{background:#1a1200;border-color:var(--ylw);color:var(--ylw)}
+.ph3{background:#150030;border-color:var(--rust);color:var(--rust-lt)}
+.ph4{background:#150030;border-color:var(--red);color:#fca5a5}
+.ph5{background:#1a0800;border-color:var(--cpp);color:var(--cpp-lt)}
+.ph-meta{flex:1}
+.ph-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.ph-sub{font-size:11px;color:var(--tx2)}
+.ph-week{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid var(--bdr3);color:var(--tx3);white-space:nowrap;flex-shrink:0;margin-top:2px}
+.ph-toggle{font-size:16px;color:var(--tx3);transition:.2s;flex-shrink:0;margin-top:6px}
+.ph-body{padding:0 18px 16px;display:none}
+.ph-body.open{display:block}
+
+/* ── TASK TABLE ── */
+.ttable{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0 12px}
+.ttable th{padding:6px 10px;border-bottom:1px solid var(--bdr2);font-size:10px;font-weight:600;color:var(--tx3);letter-spacing:.04em;text-align:left}
+.ttable td{padding:7px 10px;border-bottom:1px solid #0b1020;vertical-align:top;line-height:1.55}
+.ttable tr:last-child td{border-bottom:none}
+.ttable tr:hover td{background:#080e1c}
+.fn{font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:600}
+.fn-r{color:var(--rust-lt)}.fn-p{color:var(--py-lt)}.fn-c{color:var(--cpp-lt)}.fn-t{color:var(--proto-lt)}.fn-g{color:var(--grn)}
+.lb{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px}
+.lb-r{background:var(--rust-bg);color:var(--rust-lt)}.lb-p{background:var(--py-bg);color:var(--py-lt)}
+.lb-c{background:var(--cpp-bg);color:var(--cpp-lt)}.lb-g{background:var(--grn-bg);color:var(--grn)}
+.lb-y{background:var(--ylw-bg);color:var(--ylw)}.lb-a{background:var(--proto-bg);color:var(--proto-lt)}
+.lb-n{background:#0a1e08;color:#86efac;border:1px solid #166534}
+
+/* ── ACCEPT/ROLLBACK ── */
+.ar-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ar-box{border-radius:8px;padding:10px 12px;font-size:10px;line-height:1.7}
+.ar-ok{background:#04100a;border:1px solid #166534}
+.ar-ok .ar-t{color:#86efac;font-weight:700;margin-bottom:3px}
+.ar-rb{background:var(--red-bg);border:1px solid var(--red-d)}
+.ar-rb .ar-t{color:#fca5a5;font-weight:700;margin-bottom:3px}
+.ar-body{color:var(--tx2)}
+
+/* ── NOTE ── */
+.note{border-radius:8px;padding:10px 14px;margin:8px 0;font-size:11px;line-height:1.7}
+.n-r{background:var(--rust-bg);border:1px solid var(--rust-d)}.n-r .nt2{color:var(--rust-lt)}
+.n-p{background:var(--py-bg);border:1px solid var(--py-d)}.n-p .nt2{color:var(--py-lt)}
+.n-g{background:var(--grn-bg);border:1px solid var(--grn-d)}.n-g .nt2{color:var(--grn)}
+.n-y{background:var(--ylw-bg);border:1px solid var(--ylw-d)}.n-y .nt2{color:var(--ylw)}
+.n-a{background:var(--proto-bg);border:1px solid var(--proto-d)}.n-a .nt2{color:var(--proto-lt)}
+.n-c{background:var(--cpp-bg);border:1px solid var(--cpp-d)}.n-c .nt2{color:var(--cpp-lt)}
+.nt2{font-weight:700;margin-bottom:3px}
+
+/* ── CODE ── */
+pre{background:#030508;border:1px solid var(--bdr2);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:10.5px;line-height:1.75;overflow-x:auto;margin:8px 0 14px;tab-size:2}
+.ck{color:#818cf8}.cv{color:#f472b6}.cs{color:#34d399}.cc{color:#334155;font-style:italic}.co{color:#fb923c}.ca{color:var(--rust-lt)}.cx{color:var(--proto-lt)}
+
+/* ── FLOW ── */
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:10px 14px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;margin:8px 0}
+.fb{padding:4px 11px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}
+.fa{color:var(--bdr3);font-size:14px;padding:0 2px}
+.fl-r{background:var(--rust-bg);color:var(--rust-lt);border:1px solid var(--rust-d)}
+.fl-p{background:var(--py-bg);color:var(--py-lt);border:1px solid var(--py-d)}
+.fl-a{background:var(--proto-bg);color:var(--proto-lt);border:1px solid var(--proto-d)}
+.fl-g{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-d)}
+.fl-c{background:var(--cpp-bg);color:var(--cpp-lt);border:1px solid var(--cpp-d)}
+.fl-y{background:var(--ylw-bg);color:var(--ylw);border:1px solid var(--ylw-d)}
+.fl-lat{padding:2px 7px;border-radius:4px;background:#050d1c;color:var(--accent);border:1px solid #312e81;font-size:10px;font-weight:600}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* ── RISK TABLE ── */
+.rtable{width:100%;border-collapse:collapse;font-size:11px}
+.rtable th{padding:6px 10px;border-bottom:1px solid var(--bdr2);font-size:10px;color:var(--tx3);font-weight:600;text-align:left}
+.rtable td{padding:7px 10px;border-bottom:1px solid #0b1020;vertical-align:top;line-height:1.55}
+.rtable tr:last-child td{border-bottom:none}
+.rh{font-weight:700}
+.rv-r{color:var(--red)}.rv-y{color:var(--ylw)}.rv-g{color:var(--grn)}
+
+/* ── BOUNDARY TABLE ── */
+.btable{width:100%;border-collapse:collapse;font-size:11px}
+.btable th{padding:6px 10px;border-bottom:1px solid var(--bdr2);color:var(--tx3);font-size:10px;font-weight:600;text-align:left}
+.btable td{padding:7px 10px;border-bottom:1px solid #0b1020;vertical-align:top;line-height:1.6}
+.btable tr:last-child td{border-bottom:none}
+.btable tr:hover td{background:#070d1a}
+
+/* ── DEGRADE TABLE ── */
+.dtable{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0}
+.dtable th{padding:6px 10px;border-bottom:1px solid var(--bdr2);color:var(--tx3);font-size:10px;font-weight:600;text-align:left}
+.dtable td{padding:7px 10px;border-bottom:1px solid #0b1020;line-height:1.55;vertical-align:top}
+.dtable tr:last-child td{border-bottom:none}
+.strikethrough{text-decoration:line-through;color:var(--tx3)}
+
+/* ── DAY1 ── */
+.d1-step{display:flex;gap:14px;margin-bottom:12px;align-items:flex-start}
+.d1-num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg3);border:1px solid var(--bdr3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent)}
+.d1-body{flex:1;font-size:11px;line-height:1.7;color:var(--tx2)}
+.d1-title{font-weight:700;color:var(--tx1);margin-bottom:2px}
+
+/* ── PROGRESS BAR ── */
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11px}
+.prog-label{width:140px;flex-shrink:0;color:var(--tx2)}
+.prog-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:.3s}
+.prog-val{width:36px;text-align:right;color:var(--tx3);font-size:10px;font-family:monospace}
+
+@media(max-width:680px){.g2,.g3,.ar-grid{grid-template-columns:1fr}.hero{padding:18px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">QTS · V8 · OKX MVP</div>
+  <span class="nt on" onclick="sw('overview')">📋 总览</span>
+  <span class="nt" onclick="sw('phases')">🗓 六阶段计划</span>
+  <span class="nt" onclick="sw('boundary')">⚙️ 双核边界</span>
+  <span class="nt" onclick="sw('degrade')">🔄 降级策略</span>
+  <span class="nt" onclick="sw('pitfalls')">⚠️ OKX避坑</span>
+  <span class="nt" onclick="sw('risks')">🛡 风险矩阵</span>
+  <span class="nt" onclick="sw('day1')">🚀 Day 1清单</span>
+</nav>
+
+<!-- ══════════════════════ PAGE: OVERVIEW ══════════════════════ -->
+<div id="pg-overview" class="pg on">
+
+<div class="hero">
+  <h1>QTS V8 · OKX ETH/USDT 5m MVP · 综合开发计划</h1>
+  <div class="hero-sub">
+    融合三份开发计划精华 · 纵向切片（Vertical Slicing）敏捷原则 · Rust 热路径 / Python 冷逻辑严格边界<br>
+    首刀切向 OKX ETH-USDT 永续（5m窗口）· 单市场单标的跑通完整 L0→L7 闭环 · 再逐层叠加 V8 AI 引擎<br>
+    Phase 0–4 强制 OKX Demo Trading + 本地回测 · Phase 5 小资金实盘 · Phase 6+ 横向扩展多市场
+  </div>
+  <div class="tags">
+    <span class="tag t-r">Rust (PyO3)</span>
+    <span class="tag t-p">Python (Research/AI)</span>
+    <span class="tag t-c">Triton gRPC</span>
+    <span class="tag t-a">Protobuf 契约层</span>
+    <span class="tag t-g">OKX Demo → 实盘</span>
+    <span class="tag t-y">纵向切片</span>
+    <span class="tag t-r">SHM 零拷贝</span>
+    <span class="tag t-p">在线微调</span>
+    <span class="tag t-g">LightGBM 替身→AlphaCast</span>
+    <span class="tag t-r">Tokio MCTS</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="sv" style="color:var(--proto)">&lt;1μs</div><div class="sl">SHM 热路径</div></div>
+  <div class="stat"><div class="sv" style="color:var(--grn)">&lt;6ms</div><div class="sl">Triton gRPC</div></div>
+  <div class="stat"><div class="sv" style="color:var(--rust)">&lt;50ms</div><div class="sl">Tokio MCTS</div></div>
+  <div class="stat"><div class="sv" style="color:var(--accent)">&lt;380ms</div><div class="sl">端到端 p99</div></div>
+  <div class="stat"><div class="sv" style="color:var(--ylw)">6 阶段</div><div class="sl">Phase 0–5</div></div>
+  <div class="stat"><div class="sv" style="color:var(--grn)">9 周</div><div class="sl">MVP→实盘</div></div>
+  <div class="stat"><div class="sv" style="color:var(--cpp)">5K+</div><div class="sl">CFL标签目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--py)">&gt;55%</div><div class="sl">MCTS路径准确率</div></div>
+</div>
+
+<div class="sec">
+  <div class="sh">核心开发原则</div>
+  <div class="g2">
+    <div class="note n-g">
+      <div class="nt2">纵向切片优先</div>
+      Week 1–3 仅聚焦 OKX ETH 5m 单标的。禁止写多市场适配、禁止接 AI 推断、禁止实现跨截面排名。先跑通 L0→L7 最小闭环再叠加复杂度。每个 Phase 结束必须能独立在 Demo 环境演示，不依赖后续功能。
+    </div>
+    <div class="note n-r">
+      <div class="nt2">Rust 热路径 / Python 冷逻辑 — 严格边界</div>
+      WS 接收、SHM 缓冲、特征计算、MCTS 调度、OKX 签名、下单通道 → Rust。Alpha 规则、AI 推断客户端、门控阈值、Harness 编排、标签记录 → Python。边界不得混用，详见"双核边界"页。
+    </div>
+    <div class="note n-a">
+      <div class="nt2">契约先行</div>
+      所有跨语言数据结构统一由 <code>schemas/*.proto</code> 定义。Rust (prost) / Python (grpcio-tools) 双侧生成，杜绝运行时字段错位。字段变更强制双侧同步编译才能上线。
+    </div>
+    <div class="note n-p">
+      <div class="nt2">降级替代策略（MVP 加速器）</div>
+      AlphaCast 训练周期长 → MVP 用 LightGBM ONNX 替身，跑通 Triton gRPC 链路。MCTS 逻辑复杂 → MVP 用期望收益阈值替代，Sprint 5 再接 Tokio MCTS。CrossSection 需多标的 → MVP 暂挂，用时序百分位替代。所有替身组件均支持热插拔升级。
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">全链路数据流（目标态 Phase 5 完成后）</div>
+  <div class="flow">
+    <span class="fb fl-r">OKX WS (Rust)</span><span class="fa">→</span>
+    <span class="fb fl-r">simd_json 解析</span><span class="fa">→</span>
+    <span class="fb fl-a">SHM mmap (&lt;1μs)</span><span class="fa">→</span>
+    <span class="fb fl-r">feature_engine.rs</span><span class="fa">→</span>
+    <span class="fb fl-p">shm_bridge.py (dlpack)</span><span class="fa">→</span>
+    <span class="fb fl-c">ResNet ONNX (Triton)</span><span class="fl-lat">&lt;3ms</span><span class="fa">→</span>
+    <span class="fb fl-c">AlphaCast (Triton)</span><span class="fl-lat">&lt;6ms</span><span class="fa">→</span>
+    <span class="fb fl-r">MCTS (Tokio)</span><span class="fl-lat">&lt;50ms</span><span class="fa">→</span>
+    <span class="fb fl-p">Gating G1–G4 (Python)</span><span class="fa">→</span>
+    <span class="fb fl-p">Risk (Kelly/VaR)</span><span class="fa">→</span>
+    <span class="fb fl-r">OKX REST 签名下单 (Rust)</span><span class="fa">→</span>
+    <span class="fb fl-g">成交回执 WS → P&L</span><span class="fl-lat">总 &lt;380ms</span>
+  </div>
+  <div style="font-size:10px;color:var(--tx3);margin-top:6px">闭环反馈：实盘收益 → Redis → alphacast_online_update.py (T scaling) → Triton 热切换 · 每 50 笔触发</div>
+</div>
+
+<div class="sec">
+  <div class="sh">六阶段总览时间线</div>
+  <div class="prog-row"><span class="prog-label">Phase 0 · 基建与契约层</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--proto)"></div></div><span class="prog-val">Week 1</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 1 · MVP 最小闭环</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--grn)"></div></div><span class="prog-val">Week 2–3</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 2 · ResNet + 标签工厂</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--ylw)"></div></div><span class="prog-val">Week 4–5</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 3 · AlphaCast + Triton</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--rust)"></div></div><span class="prog-val">Week 6</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 4 · Tokio MCTS + G4</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--red)"></div></div><span class="prog-val">Week 7</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 5 · 在线微调 + 实盘</span><div class="prog-bar"><div class="prog-fill" style="width:100%;background:var(--cpp)"></div></div><span class="prog-val">Week 8–9</span></div>
+  <div class="prog-row"><span class="prog-label">Phase 6+ · 横向扩展</span><div class="prog-bar"><div class="prog-fill" style="width:40%;background:var(--accent)"></div></div><span class="prog-val">Week 10+</span></div>
+</div>
+
+</div>
+
+<!-- ══════════════════════ PAGE: PHASES ══════════════════════ -->
+<div id="pg-phases" class="pg">
+
+<!-- PHASE 0 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph0">P0</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 0 · 基建与契约层</div>
+      <div class="ph-sub">混合双核骨架 · Protobuf 全量定义 · 基础设施就绪 · OKX WS 连通性验证</div>
+    </div>
+    <span class="ph-week">Week 1</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body open">
+    <div class="note n-a"><div class="nt2">目标</div>打通 Rust 与 Python 底层通信协议，确立全项目唯一数据契约，验证 OKX WS 稳定接入，搭建 Redis + TimescaleDB。所有后续 Phase 均依赖本 Phase 交付物。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>初始化 Monorepo</td>
+        <td><span class="lb lb-r">Rust</span><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-t">Cargo.toml, pyproject.toml, docker-compose.yml</td>
+        <td class="fn fn-g" style="font-size:10px">uv sync / cargo build 零报错；maturin develop --release 编译出 .so</td>
+      </tr>
+      <tr>
+        <td>Protobuf 契约定义</td>
+        <td><span class="lb lb-a">Proto</span></td>
+        <td class="fn fn-t">schemas/market_snapshot.proto<br>schemas/unified_order.proto<br>schemas/alpha_signal.proto<br>schemas/alphacast_output.proto</td>
+        <td style="font-size:10px;color:var(--tx2)">含 OKX 专属字段：instId, tdMode, posSide, fundingRate, clOrdId。Rust 侧 prost-build 自动生成，Python 侧 grpcio-tools 生成，双侧字段类型一致性 CI 校验。</td>
+      </tr>
+      <tr>
+        <td>OKX WS 接入 (Rust)</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">adapters/okx_ws.rs</td>
+        <td style="font-size:10px;color:var(--tx2)">tokio-tungstenite 订阅 ETH-USDT-SWAP 的 trades、books5、candle5m。每 25s 发送 ping 心跳，断线 3s 内指数退避自动重连，连接状态写 Redis。</td>
+      </tr>
+      <tr>
+        <td>基础设施搭建</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">docker-compose.yml</td>
+        <td style="font-size:10px;color:var(--tx2)">Redis 7.x (16G 内存限制，AOF everysec)；TimescaleDB 2.x on PG16（cfl_labels 超表，按 day 分区）；Triton 容器预置（Sprint 4 激活）。</td>
+      </tr>
+      <tr>
+        <td>基础监控面板</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">monitor/dashboard.py</td>
+        <td style="font-size:10px;color:var(--tx2)">FastAPI + WebSocket，实时显示 WS 延迟、Tick 速率、Redis 连接状态。供所有后续 Phase 监控。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">Python 能 import v8_core_engine 并解析 Protobuf 消息；OKX WS 稳定接收 ETH trades 30min 无断线；TimescaleDB cfl_labels 表建表成功；Docker Compose 全服务 healthy</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">删除 Rust 模块，用 Python websockets 直连 OKX 验证逻辑；schemas/ 目录仅做文档用，运行时临时使用 Python dataclass；无功能影响</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 1 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph1">P1</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 1 · MVP 垂直切片最小闭环</div>
+      <div class="ph-sub">SHM热路径 · Rust特征引擎 · 经验Alpha · G1/G2门控 · OKX Demo执行</div>
+    </div>
+    <span class="ph-week">Week 2–3</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body open">
+    <div class="note n-g"><div class="nt2">目标</div>跑通"无 AI"的完整自动化交易闭环：OKX WS → SHM → Rust 特征 → Python Alpha → 门控 → OKX Demo 下单 → 成交回执 → P&L 记录。这是整个系统的骨架，后续所有 Phase 均在此基础上叠加。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>SHM 环形缓冲区</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">core/buffer.rs</td>
+        <td style="font-size:10px;color:var(--tx2)">mmap2 分配共享内存，Arc&lt;RwLock&lt;CircularBuffer&gt;&gt; 并发安全，容量 3600（1s/snapshot）。双缓冲 Ping-Pong 机制防止 Python 读取时 Rust 正在覆写。暴露 DLPack 指针给 Python 侧零拷贝读取。</td>
+      </tr>
+      <tr>
+        <td>5m 聚合特征引擎</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">core/feature_engine.rs</td>
+        <td style="font-size:10px;color:var(--tx2)">维护两个 SHM 窗口：Tick_Window（实时微观）和 5m_Bar_Window（宏观 Regime）。5m 闭盘前 200ms 利用已有 Tick 预计算 99% 特征，闭盘瞬间仅做 O(1) 修正，立即触发 Alpha 评估（解决"抢跑"问题）。基础 15 维：5m OHLCV、OBI、OFI、Spread_Z、Depth_Imbalance、mom_1m/5m、HV_5m、Hurst。</td>
+      </tr>
+      <tr>
+        <td>SHM 零拷贝桥接</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">data/shm_bridge.py</td>
+        <td style="font-size:10px;color:var(--tx2)">torch.from_dlpack 和 np.frombuffer 零拷贝读取 Rust SHM。Python 侧只读，Rust 侧管理生命周期。验证读取延迟 &lt;1μs (p99)。</td>
+      </tr>
+      <tr>
+        <td>经验 Alpha 引擎</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">alpha/crypto/obi_v2.py<br>alpha/crypto/funding_rate_arb.py</td>
+        <td style="font-size:10px;color:var(--tx2)">OBI_v2：OBI &gt; 0.6 且 mom_5m &gt; 0，阈值可配置。Funding Rate Arb：定时 REST 轮询 OKX 资金费率，结合 5m 动量判断方向。信号携带 trace_id（与后续 OKX clOrdId 绑定）。</td>
+      </tr>
+      <tr>
+        <td>G1/G2 硬门控 + 时间门</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">gating/hard_gating.py</td>
+        <td style="font-size:10px;color:var(--tx2)">G1 流动性：OKX 5m 平均盘口深度 &gt; $50K。G2 Regime：Hurst &gt; 0.5 且 HV_5m &lt; 4%。G5 时间门（OKX 专属）：资金费率结算前 30min 禁止开新仓。所有拒绝信号写 Redis 并异步入 CFL 标签队列。</td>
+      </tr>
+      <tr>
+        <td>OKX 执行通道 (Rust)</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">execution/okx_router.rs<br>execution/order_state.rs</td>
+        <td style="font-size:10px;color:var(--tx2)">HMAC-SHA256 签名（ring crate，&lt;5μs），ISO8601 时间戳 + time_offset 补偿（防 50111 错误）。Token Bucket 限流（OKX 20次/2s 限制）。OrderFSM：NEW→POSTED→PARTIAL→FILLED/CANCELED。WS 订阅 orders 频道驱动状态机。BehaviorHumanizer：Rust 层注入 0.1–0.5s Poisson 延迟 + ±0.002 价格微扰。</td>
+      </tr>
+      <tr>
+        <td>Harness 基础编排</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">harness/pipeline_v1.py<br>harness/logging_handler.py</td>
+        <td style="font-size:10px;color:var(--tx2)">串联 ShmBridge → Alpha → Gating → Risk(Kelly ≤25%) → Rust Exec。结构化 JSON 日志注入 trace_id，OKX clOrdId 与 trace_id 绑定。Telegram 告警（成交通知、G1/G2 拦截统计、断线预警）。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">SHM 读取 &lt;1μs (p99)；特征值与 Python 纯算版余弦相似度 &gt;0.99；OKX Demo 成功完成 100 次"信号→限价单→Fill→P&L"全链路；系统内部延迟（不含 OKX 网络 RTT）&lt;50ms；24h 无内存泄漏</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">关闭 feature_engine.rs，恢复 Python 版 feature_engine.py；执行通道切回 ccxt 同步调用；Harness 直接调用 Python 版特征，10s 内完成切换</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 2 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph2">P2</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 2 · ResNet 深度特征 + CFL 标签工厂</div>
+      <div class="ph-sub">178d 融合向量 · 反事实标签积累 · 扩展至 50 维特征 · 为 AlphaCast 备料</div>
+    </div>
+    <span class="ph-week">Week 4–5</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body">
+    <div class="note n-y"><div class="nt2">目标</div>接入 ResNet 128d 嵌入，构建 50d 经验 ⊕ 128d 深度 → 178d 融合向量。同步启动 CFL 反事实标签工厂（无论信号是否被门控放行，100% 记录），为 AlphaCast 和 MetaLabeler 积累 5K+ 高质量标签。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>扩展 Rust 特征至 50 维</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">core/feature_engine.rs (扩展)</td>
+        <td style="font-size:10px;color:var(--tx2)">在 Phase 1 的 15 维基础上扩展至 50 维：新增 velocity(6窗口)、跨周期动量(1m/5m/15m/1h)、订单流不平衡 OFI、微观结构熵、Realized Skewness/Kurtosis。</td>
+      </tr>
+      <tr>
+        <td>ResNet 编码器</td>
+        <td><span class="lb lb-p">Python (PyTorch)</span></td>
+        <td class="fn fn-p">models/resnet/resnet_encoder.py</td>
+        <td style="font-size:10px;color:var(--tx2)">Conv1D 6 残差块，多尺度 [30/60/120/240s] 时序感受野，BatchNorm + LeakyReLU，输出 128d 嵌入。GPU 训练服务器离线训练，导出 ONNX。</td>
+      </tr>
+      <tr>
+        <td>注意力门控融合</td>
+        <td><span class="lb lb-p">Python (PyTorch)</span></td>
+        <td class="fn fn-p">models/resnet/feature_fusion.py</td>
+        <td style="font-size:10px;color:var(--tx2)">经验 Alpha 50d ⊕ ResNet 128d → 注意力门控 → 178d 融合向量。融合延迟 &lt;2ms，与 ONNXRuntime 本地推断对接（Phase 3 迁移至 Triton）。</td>
+      </tr>
+      <tr>
+        <td>本地 ResNet 推断服务</td>
+        <td><span class="lb lb-p">Python (ONNX)</span></td>
+        <td class="fn fn-p">models/resnet/serve_resnet.py</td>
+        <td style="font-size:10px;color:var(--tx2)">ONNXRuntime 本地批量推断，&lt;5ms。接口与 Triton gRPC 兼容，Phase 3 可无缝切换（仅改 endpoint 配置）。</td>
+      </tr>
+      <tr>
+        <td>CFL 反事实标签工厂</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">labeling/counterfactual_labeler.py</td>
+        <td style="font-size:10px;color:var(--tx2)">无论 G1–G3 是否放行，100% 异步记录：178d 特征快照、AlphaSignal 内容、门控决策、后续 5m/15m/30m/2h 真实收益（多窗口标注）。写入 TimescaleDB cfl_labels 表。V8 新增字段：占位 AlphaCast.conf=0 和 MCTS.value=0，Phase 3/4 填充。</td>
+      </tr>
+      <tr>
+        <td>G3 时序百分位门（单标的版）</td>
+        <td><span class="lb lb-p">Python (Polars)</span></td>
+        <td class="fn fn-p">gating/cross_section.py (单标的)</td>
+        <td style="font-size:10px;color:var(--tx2)">暂不做跨市场横截面，用 ETH 5m 自身历史分布（滚动 7d 窗口）计算各特征百分位，合成 cs_composite ∈ [0,1]。G3 阈值 cs_composite &lt; 0.35 拒绝，pass_rate 控制在 20–50%。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">178d 融合向量余弦相似度基线 &gt;0.85；ResNet 推断 &lt;5ms；TimescaleDB 每天稳定写入 &gt;288 条 CFL 标签（24h × 12条/h）；TimescaleDB 查询延迟 &lt;100ms</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">禁用 ResNet 分支，feature_fusion 直通 50d 经验特征；CFL 仅写 Redis 不写 TimescaleDB；G3 暂时关闭，G1/G2 双门控继续运行</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 3 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph3">P3</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 3 · AlphaCast 接入 + Triton gRPC 上线</div>
+      <div class="ph-sub">LightGBM 替身→Transformer · Triton 动态 batching · 二次校准 · G4 MetaLabeler</div>
+    </div>
+    <span class="ph-week">Week 6</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body">
+    <div class="note n-r"><div class="nt2">目标</div>部署 Triton，先用 LightGBM ONNX 替身跑通 gRPC 推断链路（验证基础设施），再换入真正的 AlphaCast Transformer。同步激活 G4 MetaLabeler（需 CFL 标签 &gt;2K 才能训练）。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>Triton 部署与预热</td>
+        <td><span class="lb lb-c">C++/Infra</span></td>
+        <td class="fn fn-c">triton_model_repository/</td>
+        <td style="font-size:10px;color:var(--tx2)">部署 NVIDIA Triton，配置 ResNet ONNX 和 AlphaCast TorchScript Model Repository。动态 batching：preferred=[4,8,16]，max_queue_delay=3000μs。启动时发送 10 个 Dummy 请求预热（防冷启动延迟数百ms）。配置 instance_group 保持模型常驻显存。</td>
+      </tr>
+      <tr>
+        <td>LightGBM 替身模型（过渡）</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">models/alphacast/lgbm_proxy.onnx</td>
+        <td style="font-size:10px;color:var(--tx2)">用历史 5m 数据训练轻量级 LightGBM（预测下一 5m 涨跌概率），导出 ONNX 入 Triton。目的：跑通 gRPC 链路，不等 AlphaCast 训练完成。AlphaCast 训练完成后热替换，无需停机。</td>
+      </tr>
+      <tr>
+        <td>AlphaCast 模型（正式）</td>
+        <td><span class="lb lb-p">Python (PyTorch)</span></td>
+        <td class="fn fn-p">models/alphacast/alphacast_model.py<br>models/alphacast/train_alphacast.py</td>
+        <td style="font-size:10px;color:var(--tx2)">Transformer 6L8H，输入 178d×60步，多任务输出：预测收益 ŷ、不确定性 σ、置信度 conf、市场状态。GPU 训练服务器离线训练，导出 TorchScript 推入 Triton 替换 LightGBM 替身。离线 IC 目标 &gt;0.05。</td>
+      </tr>
+      <tr>
+        <td>Triton gRPC 推断客户端</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">models/alphacast/serve_alphacast.py</td>
+        <td style="font-size:10px;color:var(--tx2)">tritonclient[grpc] 替换原 HTTP 调用，动态 batching 正常工作，gRPC 推断延迟 &lt;6ms。GPU 利用率目标 &gt;40%。</td>
+      </tr>
+      <tr>
+        <td>MCTS 替身（期望收益阈值）</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">models/mcts/ev_threshold.py</td>
+        <td style="font-size:10px;color:var(--tx2)">Phase 4 正式 MCTS 上线前，用简单规则替代：ŷ × conf &gt; threshold 且 σ &lt; max_sigma 则通过。等价于 MCTS 单步展望，保持链路完整性。</td>
+      </tr>
+      <tr>
+        <td>AlphaCast 二次校准</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">models/alphacast/alphacast_recalib.py</td>
+        <td style="font-size:10px;color:var(--tx2)">过滤规则：conf &lt; 0.55 拒绝，σ 过大降仓，收益/风险比 &lt; 1.0 放弃。仓位精炼：AlphaCast.conf 作为乘数加权最终仓位大小。</td>
+      </tr>
+      <tr>
+        <td>G4 MetaLabeler（条件激活）</td>
+        <td><span class="lb lb-p">Python (LightGBM)</span></td>
+        <td class="fn fn-p">ml/meta_labeler.py</td>
+        <td style="font-size:10px;color:var(--tx2)">CFL 标签 &gt;2K 时触发首次训练（正式激活需 5K）。输入：178d 特征 + AlphaCast.conf + MCTS.value（Phase 4 前为 0）。Top-Decile Filter，threshold = percentile(val_preds, 90)。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">Triton gRPC 推断 &lt;6ms；GPU 利用率 &gt;40%；AlphaCast 离线 IC &gt;0.05；conf 分布合理（0.4–0.8 区间为主）；LightGBM→AlphaCast 热替换不中断服务</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">conf 固定 0.5，回退 LightGBM 替身或经验规则逻辑；G4 禁用（is_active=False），G1–G3 硬门控接管；Triton 切回 ONNXRuntime 本地推断</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 4 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph4">P4</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 4 · Tokio MCTS 正式接入 + 全链路串联</div>
+      <div class="ph-sub">Rust UCB1 异步树搜索 · PyO3 Rollout 回调 · &lt;50ms · 无死锁验证</div>
+    </div>
+    <span class="ph-week">Week 7</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body">
+    <div class="note n-r"><div class="nt2">目标</div>用真正的 Tokio 异步 MCTS 替换 Phase 3 的期望收益阈值替身。关键挑战：Python asyncio event loop 与 Tokio runtime 不能在同一线程内嵌套，必须用 spawn_blocking + channel 隔离。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>Tokio MCTS 核心</td>
+        <td><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-r">core/mcts_core.rs</td>
+        <td style="font-size:10px;color:var(--tx2)">UCB1 树搜索，4 类动作（buy/sell/hold/close）× 仓位离散化（5档）。8 个 Tokio worker 并发。AlphaCast Rollout 通过 PyO3 回调 Python Triton 客户端（注意：必须在独立 Tokio 线程内 spawn_blocking 调用 Python，禁止在 async 上下文直接调用 PyO3）。Sharpe 加权奖励，γ=0.95，λ=0.3。结果写 Redis（TTL=30s）。</td>
+      </tr>
+      <tr>
+        <td>asyncio/Tokio 隔离层</td>
+        <td><span class="lb lb-r">Rust</span><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-r">core/mcts_core.rs (async 边界)</td>
+        <td style="font-size:10px;color:var(--tx2)">在独立 OS 线程中启动 Tokio runtime（避免嵌套 event loop 死锁）。Python 侧通过 asyncio.get_event_loop().run_in_executor 调用 Rust Future，用 tokio::sync::mpsc channel 传递结果。严格验证：MCTS 结果回传不阻塞 WS 接收线程。</td>
+      </tr>
+      <tr>
+        <td>MCTS Worker 调度</td>
+        <td><span class="lb lb-p">Python (asyncio)</span></td>
+        <td class="fn fn-p">models/mcts/mcts_worker.py</td>
+        <td style="font-size:10px;color:var(--tx2)">异步任务池调度，Redis 结果缓存（TTL=30s），降级模式（超时时直接使用 AlphaCast 输出）。超时熔断：MCTS &gt;100ms 自动降级，记录告警。</td>
+      </tr>
+      <tr>
+        <td>二次校准整合</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">models/alphacast/alphacast_recalib.py (更新)</td>
+        <td style="font-size:10px;color:var(--tx2)">MCTS 最优路径后接 Temperature Scaling 二次校准。MCTS.path_value 正式填充 CFL 标签的 mcts_value 字段，更新 G4 MetaLabeler 特征集。</td>
+      </tr>
+      <tr>
+        <td>pipeline_v2 全链路串联</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">harness/pipeline_v2.py</td>
+        <td style="font-size:10px;color:var(--tx2)">WS 线程 → SHM → 特征 → ResNet → AlphaCast → MCTS (异步) → 门控 → 风控 → 执行。验证：各环节通过 Redis Stream 或 SHM 异步解耦，无阻塞，无死锁。全链路 &lt;220ms（含 MCTS）。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">MCTS 1000 次仿真 &lt;50ms；全链路 &lt;220ms（含 MCTS）；MCTS 路径准确率 &gt;55%；WS 接收线程不因 MCTS 阻塞；连续压测 2h 无死锁；Redis MCTS 缓存命中率 &gt;70%</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">跳过 MCTS，AlphaCast 直接输出 + 期望收益阈值替代；mcts_worker.py 降级模式固定触发；Rust mcts_core.rs 编译但不调用</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 5 -->
+<div class="phase" style="background:var(--bg2)">
+  <div class="ph-head" onclick="toggle(this)">
+    <div class="ph-badge ph5">P5</div>
+    <div class="ph-meta">
+      <div class="ph-title">Phase 5 · 在线微调 + 生产加固 + 小资金实盘</div>
+      <div class="ph-sub">分钟级 Temperature Scaling · 风控加固 · 全链路压测 · OKX 实盘切换</div>
+    </div>
+    <span class="ph-week">Week 8–9</span>
+    <div class="ph-toggle">▼</div>
+  </div>
+  <div class="ph-body">
+    <div class="note n-c"><div class="nt2">目标</div>激活 V8 闭环反馈飞轮：实盘收益→在线微调→Triton 热切换，响应从周级降至分钟级。完成全链路压测（500 TPS Tick 注入），通过后切换至 OKX 实盘小资金（ETH 单笔 ≤$500，日亏停 ≤$100）。</div>
+    <table class="ttable">
+      <tr><th>任务</th><th>归属</th><th>交付物</th><th>关键说明</th></tr>
+      <tr>
+        <td>在线微调模块</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">calibration/alphacast_online_update.py</td>
+        <td style="font-size:10px;color:var(--tx2)">每 50 笔成交触发 Temperature Scaling 系数 T 更新（L-BFGS 优化 NLL loss，&lt;100ms）。EMA 平滑（α=0.3），T ∈ [0.5, 3.0] 硬限制，连续 3 次方向相反则暂停并告警。推送至 Triton 模型仓库热切换（无停机）。</td>
+      </tr>
+      <tr>
+        <td>P&L 与预测误差追踪</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">monitor/pnl_tracker.py</td>
+        <td style="font-size:10px;color:var(--tx2)">实时 Sharpe/Sortino/MaxDD，AlphaCast 预测收益 vs 实际收益误差追踪（目标 &lt;15%），MCTS 路径准确率统计，IC 衰减监控（降至 0.03 触发重训告警）。</td>
+      </tr>
+      <tr>
+        <td>MetaLabeler 全量激活（≥5K）</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">ml/meta_labeler.py (正式激活)</td>
+        <td style="font-size:10px;color:var(--tx2)">CFL 标签 ≥5K 触发完整训练。每 7 天滚动 30d 窗口重训。IC 衰减 → 告警 + 重训。AUC 目标 &gt;0.55，lift &gt;1.3x。G4 正式上线，is_active=True。</td>
+      </tr>
+      <tr>
+        <td>全链路压测</td>
+        <td><span class="lb lb-p">Python</span></td>
+        <td class="fn fn-p">tests/load_test.py</td>
+        <td style="font-size:10px;color:var(--tx2)">模拟 500 TPS Tick 注入，端到端延迟 &lt;380ms (p99)，内存平稳（&lt;1GB/h 增长）。压测持续 4h，验证无 OOM、无死锁、无 Redis 积压。</td>
+      </tr>
+      <tr>
+        <td>实盘切换</td>
+        <td><span class="lb lb-p">Python</span><span class="lb lb-r">Rust</span></td>
+        <td class="fn fn-p">config/settings.py (LIVE_MODE=True)</td>
+        <td style="font-size:10px;color:var(--tx2)">切换 OKX Demo → 实盘 API Key（仅改配置，代码零修改）。风控硬限：ETH 单笔 ≤$500，日亏损 ≤$100 强制平仓并停机。住宅代理执行层激活（Phase 1 OKX 直连，Phase 5 启用代理轮换）。</td>
+      </tr>
+    </table>
+    <div class="ar-grid">
+      <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">系统 7×24h 无崩溃；在线微调 ECE &lt;0.05；预测误差 &lt;15%；压测 p99 &lt;380ms；实盘 P&L 跟踪误差 &lt;1%；MetaLabeler AUC &gt;0.55（如标签已达 5K）</div></div>
+      <div class="ar-box ar-rb"><div class="ar-t">↩ 回滚方案</div><div class="ar-body">关闭在线微调（T 固定 1.0），回退离线权重；执行通道切回 VPS 直连（临时），关闭代理轮换；LIVE_MODE=False 切回 Demo，30s 内完成</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="note n-p" style="margin-top:16px">
+  <div class="nt2">Phase 6+ · 横向扩展（Week 10+）</div>
+  接入 Polymarket CLOB（Rust poly_adapter.rs）、美股 Alpaca/IB（Python equity_adapter.py）、外汇 MT5 ZMQ（Python forex_adapter.py）→ 激活完整 cross_section.py 多市场百分位排名 → MCTS 步数 N 按流动性动态调整（5–20步）→ 启动多市场迁移学习与联合回测 → 接入 12 引擎并行 Alpha 体系
+</div>
+
+</div>
+
+<!-- ══════════════════════ PAGE: BOUNDARY ══════════════════════ -->
+<div id="pg-boundary" class="pg">
+<div class="sec">
+  <div class="sh">Rust / Python 双核职责边界（OKX ETH 5m 专属）</div>
+  <div class="note n-r"><div class="nt2">核心原则</div>边界一旦确立，不得混用。Rust 侧的任何逻辑不得直接调用 Python AI 框架（PyTorch/Triton），只能通过 PyO3 暴露接口并在 allow_threads 上下文内回调。Python 侧不得直接读写 SHM 原始内存，必须通过 shm_bridge.py 的零拷贝接口。</div>
+  <table class="btable">
+    <tr><th>模块</th><th>归属</th><th>技术栈</th><th>边界理由</th><th>Phase 接入</th></tr>
+    <tr>
+      <td class="fn fn-r">OKX WS 订阅与解析</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>tokio-tungstenite · simd_json</td>
+      <td style="font-size:10px;color:var(--tx2)">高频 Tick 流，Python GIL 会造成帧丢失。simd_json SIMD 加速解析比 Python json 快 10x+。</td>
+      <td><span class="lb lb-g">P0</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-r">SHM 缓冲区管理</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>memmap2 · Arc&lt;RwLock&gt;</td>
+      <td style="font-size:10px;color:var(--tx2)">内存安全由 Rust 所有权保证，Arc&lt;RwLock&gt; 防并发竞争。Python 仅获取只读 DLPack 指针。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-r">5m 窗口特征计算</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>Rayon 并行 · SIMD</td>
+      <td style="font-size:10px;color:var(--tx2)">纯数学计算，Rust 比 NumPy 快 10x+，无序列化开销。&lt;1μs 目标只有 Rust 能达到。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-r">OKX API 签名与下单</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>reqwest · ring (HMAC)</td>
+      <td style="font-size:10px;color:var(--tx2)">签名需 &lt;5μs（OKX 时间戳防重放窗口 30s），Rust ring crate 零成本抽象，Python hmac 慢约 30x。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-r">订单状态机 (FSM)</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>enum + 状态模式 + 原子操作</td>
+      <td style="font-size:10px;color:var(--tx2)">并发安全，防重复下单/撤单死锁。Rust 枚举穷举保证所有状态覆盖，编译时捕获遗漏分支。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-r">MCTS UCB1 树搜索</td>
+      <td><span class="lb lb-r">Rust</span></td>
+      <td>Tokio · PyO3 Rollout 回调</td>
+      <td style="font-size:10px;color:var(--tx2)">CPU 密集型树搜索，Tokio 异步 8 worker 并发。Python GIL 下无法真正并发，必须在 Rust 内完成搜索逻辑，仅 Rollout 步骤回调 Python Triton。</td>
+      <td><span class="lb lb-y">P4</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-p">Alpha 信号生成</td>
+      <td><span class="lb lb-p">Python</span></td>
+      <td>Polars · NumPy</td>
+      <td style="font-size:10px;color:var(--tx2)">策略逻辑频繁迭代，Python 修改无需重新编译 Rust（maturin 编译一次需 30–120s）。研究属性强，需要 Jupyter 调试。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-p">Triton gRPC 推断</td>
+      <td><span class="lb lb-p">Python</span></td>
+      <td>tritonclient[grpc] · PyTorch</td>
+      <td style="font-size:10px;color:var(--tx2)">与 AI 生态无缝衔接，批量发送 178d 特征向量。gRPC 本身已经足够快（&lt;6ms），Python 调用开销可忽略。</td>
+      <td><span class="lb lb-y">P3</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-p">门控与风控 (G1–G4)</td>
+      <td><span class="lb lb-p">Python</span></td>
+      <td>纯 Python 逻辑</td>
+      <td style="font-size:10px;color:var(--tx2)">阈值参数频繁调整（如 G2 Regime 阈值随市场 regime 变化），Python 热重载无需重编译。不在热路径上，延迟可接受。</td>
+      <td><span class="lb lb-g">P1</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-p">标签记录与回测</td>
+      <td><span class="lb lb-p">Python</span></td>
+      <td>asyncpg · TimescaleDB</td>
+      <td style="font-size:10px;color:var(--tx2)">冷路径操作（&gt;10ms 可接受），asyncpg 异步写入不阻塞热路径。SQL 查询适合 Python 调试分析。</td>
+      <td><span class="lb lb-g">P2</span></td>
+    </tr>
+    <tr>
+      <td class="fn fn-p">在线微调</td>
+      <td><span class="lb lb-p">Python</span></td>
+      <td>scipy (L-BFGS) · Triton API</td>
+      <td style="font-size:10px;color:var(--tx2)">优化过程 &lt;100ms（每 50 笔触发，非热路径）。依赖 scipy 和 PyTorch 生态，Python 侧最自然。</td>
+      <td><span class="lb lb-c">P5</span></td>
+    </tr>
+  </table>
+</div>
+
+<div class="sec">
+  <div class="sh">SHM 零拷贝数据流详解</div>
+  <pre><span class="cc"># Rust 侧：写入 SHM（feature_engine.rs）</span>
+<span class="ck">pub fn</span> <span class="cv">on_5m_close</span>(&self, bar: &OkxBar) -> <span class="ca">DLPackTensor</span> {
+    <span class="ck">let mut</span> buf = self.shm.write().unwrap();
+    <span class="ck">let</span> features = self.compute_50d_features(bar); <span class="cc">// <1μs</span>
+    buf.push(features);
+    buf.to_dlpack_ptr()   <span class="cc">// 返回 DLPack 指针，Python 侧零拷贝读取</span>
+}
+
+<span class="cc"># Python 侧：零拷贝读取（shm_bridge.py）</span>
+<span class="ck">import</span> v8_core_engine <span class="ck">as</span> vce
+<span class="ck">import</span> torch
+
+bridge = vce.ShmBridge()
+<span class="cv">feat_tensor</span> = torch.from_dlpack(bridge.get_window(60))
+<span class="cc"># feat_tensor: shape [60, 50], dtype float32, 零拷贝，共享物理内存页</span>
+<span class="cc"># 直接送入 ResNet 编码器，不发生任何数据复制</span>
+triton_input = feat_tensor.unsqueeze(0)  <span class="cc"># [1, 60, 50]</span></pre>
+</div>
+</div>
+
+<!-- ══════════════════════ PAGE: DEGRADE ══════════════════════ -->
+<div id="pg-degrade" class="pg">
+<div class="sec">
+  <div class="sh">V8 组件降级替代策略（MVP 加速核心）</div>
+  <div class="note n-y"><div class="nt2">设计哲学</div>V8 的每个重量级组件都配备一个"替身"：功能等价（链路完整）但实现更轻（训练周期短、依赖少）。MVP 阶段用替身跑通基础设施，正式版本准备好后热插拔替换，无需停机。每次替换均有独立验收标准。</div>
+  <table class="dtable">
+    <tr><th>V8 组件</th><th>MVP 替身</th><th>替身接入 Phase</th><th>正式升级 Phase</th><th>热插拔方式</th></tr>
+    <tr>
+      <td><span class="fn fn-p">AlphaCast (Transformer 6L8H)</span><br><span style="font-size:9px;color:var(--tx3)">需大量历史数据训练，周期长</span></td>
+      <td><span class="fn fn-p" style="color:var(--ylw)">LightGBM ONNX 替身</span><br><span style="font-size:9px;color:var(--tx2)">历史 5m 数据快速训练，导出 ONNX 入 Triton</span></td>
+      <td><span class="lb lb-y">P3</span></td>
+      <td><span class="lb lb-r">P3 末期</span><br><span style="font-size:9px;color:var(--tx3)">AlphaCast 训练完成后</span></td>
+      <td style="font-size:10px;color:var(--tx2)">仅替换 Triton Model Repository 中的模型文件，gRPC 接口/输出格式不变，客户端代码零修改</td>
+    </tr>
+    <tr>
+      <td><span class="fn fn-r">Tokio MCTS (UCB1 树搜索)</span><br><span style="font-size:9px;color:var(--tx3)">复杂度高，asyncio/Tokio 隔离有技巧</span></td>
+      <td><span class="fn fn-p" style="color:var(--ylw)">期望收益阈值 (EV Threshold)</span><br><span style="font-size:9px;color:var(--tx2)">ŷ × conf &gt; threshold 且 σ &lt; max_sigma，等价 MCTS 单步展望</span></td>
+      <td><span class="lb lb-y">P3</span></td>
+      <td><span class="lb lb-r">P4</span></td>
+      <td style="font-size:10px;color:var(--tx2)">mcts_worker.py 切换 USE_TOKIO_MCTS=True，ev_threshold.py 保留作降级后备</td>
+    </tr>
+    <tr>
+      <td><span class="fn fn-p">CrossSection (多市场横截面)</span><br><span style="font-size:9px;color:var(--tx3)">需要多市场数据，MVP 只有单标的</span></td>
+      <td><span class="fn fn-p" style="color:var(--ylw)">时序百分位 (ETH 自身历史分布)</span><br><span style="font-size:9px;color:var(--tx2)">滚动 7d 窗口自身分位数，Polars 计算</span></td>
+      <td><span class="lb lb-y">P2</span></td>
+      <td><span class="lb lb-p">P6+ (多市场)</span></td>
+      <td style="font-size:10px;color:var(--tx2)">cross_section.py 接口不变，Phase 6 接入多市场数据后内部逻辑扩展</td>
+    </tr>
+    <tr>
+      <td><span class="fn fn-p">G4 MetaLabeler (LightGBM)</span><br><span style="font-size:9px;color:var(--tx3)">需要 5K+ 标签才能有效训练</span></td>
+      <td><span class="fn fn-p" style="color:var(--ylw)">conf &gt; 0.6 硬阈值直通</span><br><span style="font-size:9px;color:var(--tx2)">2K 标签时预训练，5K 时正式激活</span></td>
+      <td><span class="lb lb-y">P3 (预训)</span></td>
+      <td><span class="lb lb-c">P5 (正式)</span></td>
+      <td style="font-size:10px;color:var(--tx2)">meta_labeler.py 的 is_active Flag，CFL 标签积累自动触发</td>
+    </tr>
+    <tr>
+      <td><span class="fn fn-r">住宅代理执行层</span><br><span style="font-size:9px;color:var(--tx3)">Demo 阶段不需要，增加复杂度</span></td>
+      <td><span class="fn fn-r" style="color:var(--ylw)">VPS 直连 OKX Demo</span><br><span style="font-size:9px;color:var(--tx2)">P1–P4 全程 VPS IP 直连模拟盘</span></td>
+      <td><span class="lb lb-g">P1</span></td>
+      <td><span class="lb lb-c">P5 (实盘)</span></td>
+      <td style="font-size:10px;color:var(--tx2)">proxy_router.py 的 USE_PROXY Flag，实盘切换时同步启用</td>
+    </tr>
+    <tr>
+      <td><span class="fn fn-r">exec_channels.rs (Poly/Crypto 完整版)</span><br><span style="font-size:9px;color:var(--tx3)">MVP 仅需 OKX 通道</span></td>
+      <td><span class="fn fn-r" style="color:var(--ylw)">okx_router.rs (OKX 专属)</span><br><span style="font-size:9px;color:var(--tx2)">仅实现 OKX REST V5，接口与完整版一致</span></td>
+      <td><span class="lb lb-g">P1</span></td>
+      <td><span class="lb lb-p">P6+ (多市场)</span></td>
+      <td style="font-size:10px;color:var(--tx2)">UnifiedOrder 路由层在 smart_router.py，新增市场仅需扩展路由表</td>
+    </tr>
+  </table>
+</div>
+</div>
+
+<!-- ══════════════════════ PAGE: PITFALLS ══════════════════════ -->
+<div id="pg-pitfalls" class="pg">
+<div class="sec">
+  <div class="sh">OKX 平台专属技术难点与对策（避坑指南）</div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">🕐</div>
+      <div class="ph-meta"><div class="ph-title">5m K线闭合"抢跑"问题</div><div class="ph-sub">WS 推送闭合事件有网络延迟，错过最佳限价单位置</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>OKX WS 推送 5m K线闭合事件可能存在几十毫秒网络延迟。如果等收到"闭合"信号再计算特征→推断→下单，会错过最佳限价单位置（价格已经移动）。</div>
+      <div class="note n-g"><div class="nt2">解法：本地高精度时钟预计算</div>Rust 侧维护 NTP 校准的本地时钟，在 5m 周期结束前 200ms，利用已有 Tick 数据提前预计算 99% 的特征。K线一闭合，只做最后的 O(1) 修正（更新 close 价格），立即触发 Alpha 评估。</div>
+      <pre><span class="cc">// core/feature_engine.rs — 5m 预计算策略</span>
+<span class="ck">fn</span> <span class="cv">on_tick</span>(&<span class="ck">mut</span> self, tick: &Tick) {
+    self.update_partial_bar(tick);
+    <span class="ck">let</span> remaining_ms = self.time_to_bar_close_ms();
+    <span class="ck">if</span> remaining_ms < <span class="co">200</span> && !self.precomputed {
+        <span class="cc">// 提前 200ms 预计算所有特征（只缺最终 close 价格）</span>
+        self.partial_features = self.compute_50d_features_partial();
+        self.precomputed = <span class="ck">true</span>;
+    }
+    <span class="ck">if</span> remaining_ms == <span class="co">0</span> {
+        <span class="cc">// K线闭合：O(1) 修正 close 价格，立即触发</span>
+        self.partial_features.update_close(tick.price);
+        self.trigger_alpha_evaluation();  <span class="cc">// <5μs 延迟</span>
+        self.precomputed = <span class="ck">false</span>;
+    }
+}</pre>
+    </div>
+  </div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">⚡</div>
+      <div class="ph-meta"><div class="ph-title">OKX API 限频与 IP 封禁</div><div class="ph-sub">下单接口 20次/2s，极端行情连续信号触发 IP 短暂封禁</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>OKX 下单接口限频 20次/2s（私有接口）。极端行情下 Alpha 引擎连续触发信号，可能导致 IP 被短暂封禁（错误码 50011）。同时，规律性的 API 调用节奏容易被 OKX 风控识别为机器人。</div>
+      <div class="note n-g"><div class="nt2">解法：令牌桶 + Redis 全局计数器 + 行为伪装</div>Rust exec_channels.rs 实现令牌桶算法（速率 18次/2s，留 10% 余量）。Redis 维护滑动窗口计数器（INCR + EXPIRE），跨进程共享限频状态。接近阈值时自动降级为挂单或丢弃低置信度信号。BehaviorHumanizer 注入 Poisson 节奏随机化（0.1–0.5s 延迟，±0.002 价格微扰）。</div>
+      <pre><span class="cc">// execution/okx_router.rs — 令牌桶限流</span>
+<span class="ck">async fn</span> <span class="cv">place_order</span>(&self, order: UnifiedOrder) -> Result&lt;Receipt&gt; {
+    <span class="cc">// 检查 Redis 滑动窗口计数器</span>
+    <span class="ck">let</span> count = redis_incr_expire(<span class="cs">"okx:rate:2s"</span>, <span class="co">2</span>).<span class="ck">await</span>?;
+    <span class="ck">if</span> count > <span class="co">18</span> && order.confidence < <span class="co">0.7</span> {
+        <span class="cc">// 低置信度信号限频时丢弃（不影响高置信度信号）</span>
+        <span class="ck">return</span> Err(RateLimit);
+    }
+    <span class="cc">// BehaviorHumanizer：Poisson 延迟 + 价格微扰</span>
+    <span class="ck">let</span> delay = poisson_delay(<span class="co">0.1</span>, <span class="co">0.5</span>);
+    tokio::time::sleep(delay).<span class="ck">await</span>;
+    self.sign_and_send(order).<span class="ck">await</span>
+}</pre>
+    </div>
+  </div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">💱</div>
+      <div class="ph-meta"><div class="ph-title">资金费率结算陷阱</div><div class="ph-sub">每 8h 结算前套利大军平仓，5m 策略误判 regime</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>ETH 永续每 8 小时结算一次资金费率（UTC 00:00 / 08:00 / 16:00）。结算前约 30–60 分钟，套利大军集中平仓/反向开仓，价格剧烈波动，此时的 5m K线特征失去正常预测性，Alpha 信号质量骤降。</div>
+      <div class="note n-g"><div class="nt2">解法：G5 时间门控 + 资金费率方向融合</div>hard_gating.py 新增 G5 时间门：结算前 30 分钟禁止开新仓（平仓不受影响）。同时将 OKX REST 轮询的实时资金费率（nextFundingRate 字段）作为 Funding Rate Arb 策略的核心输入，把结算期"噪音"转化为可预测的收益机会。</div>
+      <pre><span class="cc"># gating/hard_gating.py — G5 时间门控</span>
+FUNDING_TIMES_UTC = [<span class="co">0</span>, <span class="co">8</span>, <span class="co">16</span>]  <span class="cc"># OKX 每天 3 次结算</span>
+
+<span class="ck">def</span> <span class="cv">g5_time_gate</span>(signal) -> <span class="ck">bool</span>:
+    now_utc = datetime.utcnow()
+    <span class="ck">for</span> h <span class="ck">in</span> FUNDING_TIMES_UTC:
+        settlement = now_utc.replace(hour=h, minute=<span class="co">0</span>, second=<span class="co">0</span>)
+        delta_min = (settlement - now_utc).total_seconds() / <span class="co">60</span>
+        <span class="ck">if</span> -<span class="co">5</span> <= delta_min <= <span class="co">30</span>:  <span class="cc"># 结算前30min到结算后5min</span>
+            <span class="ck">if</span> signal.action <span class="ck">in</span> [<span class="cs">'buy'</span>, <span class="cs">'sell'</span>]:
+                <span class="ck">return False</span>  <span class="cc"># 禁止开新仓</span>
+    <span class="ck">return True</span></pre>
+    </div>
+  </div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">🔐</div>
+      <div class="ph-meta"><div class="ph-title">HMAC 签名与时间戳防重放</div><div class="ph-sub">OKX 要求 ±30s 时间窗口，服务器时钟漂移导致 50111 错误</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>OKX REST API 要求请求时间戳与其服务器时间差 &lt;30s（错误码 50111）。VPS 本地时钟漂移、NTP 同步延迟可能导致签名验证失败，尤其在高并发下单时批量失败。</div>
+      <div class="note n-g"><div class="nt2">解法：启动时计算 time_offset，所有请求自动补偿</div>Rust 启动时通过 GET /api/v5/public/time 获取 OKX 服务器时间，计算 time_offset = okx_ts - local_ts。后续所有请求使用 (local_time_ns + time_offset) 作为时间戳。每 5 分钟重新同步一次（防止 VPS 时钟持续漂移）。</div>
+      <pre><span class="cc">// execution/okx_router.rs — 时间戳自动补偿</span>
+<span class="ck">struct</span> <span class="ca">OkxSigner</span> { time_offset_ns: AtomicI64 }
+
+<span class="ck">async fn</span> <span class="cv">sync_time</span>(&self) {
+    <span class="ck">let</span> okx_ts = get_okx_server_time().<span class="ck">await</span>;
+    <span class="ck">let</span> offset = okx_ts - SystemTime::now_ns();
+    self.time_offset_ns.store(offset, Ordering::Relaxed);
+}
+
+<span class="ck">fn</span> <span class="cv">sign_request</span>(&self, method: &str, path: &str, body: &str) -> Headers {
+    <span class="ck">let</span> ts = (SystemTime::now_ns() + self.time_offset_ns.load(Relaxed)) / 1_000_000;
+    <span class="ck">let</span> prehash = format!(<span class="cs">"{}{}{}{}"</span>, ts, method, path, body);
+    <span class="ck">let</span> sig = hmac_sha256(&self.secret_key, &prehash);  <span class="cc">// <5μs</span>
+    build_headers(ts, sig)
+}</pre>
+    </div>
+  </div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">🧊</div>
+      <div class="ph-meta"><div class="ph-title">Triton 模型冷启动延迟</div><div class="ph-sub">首次推断或长时间闲置后延迟数百 ms，影响第一笔信号</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>Triton 首次加载 ONNX 模型（显存分配 + CUDA kernel 编译），或长时间无请求后模型被换出显存，第一次推断可能需要 300–800ms，远超 &lt;6ms 目标。</div>
+      <div class="note n-g"><div class="nt2">解法：启动预热 + 常驻显存配置</div>pipeline_runner.py 启动时发送 10 个 dummy 请求进行预热（输入为全零张量）。Triton config.pbtxt 配置 instance_group.kind=KIND_GPU 保持模型常驻显存。额外：设置 Triton --model-load-thread-count=2 并行加载 ResNet 和 AlphaCast，启动时间从 ~10s 降至 ~4s。</div>
+      <pre><span class="cc"># harness/pipeline_runner.py — Triton 预热</span>
+<span class="ck">async def</span> <span class="cv">warmup_triton</span>(client):
+    dummy = np.zeros([<span class="co">1</span>, <span class="co">60</span>, <span class="co">178</span>], dtype=np.float32)
+    <span class="ck">for</span> _ <span class="ck">in</span> range(<span class="co">10</span>):
+        <span class="ck">await</span> client.infer(<span class="cs">"alphacast"</span>, dummy)
+    logger.info(<span class="cs">"Triton 预热完成，模型已常驻显存"</span>)</pre>
+    </div>
+  </div>
+
+  <div class="phase" style="background:var(--bg2);margin-bottom:10px">
+    <div class="ph-head" onclick="toggle(this)" style="cursor:pointer">
+      <div style="font-size:18px;flex-shrink:0">🔄</div>
+      <div class="ph-meta"><div class="ph-title">asyncio / Tokio 嵌套死锁</div><div class="ph-sub">Python asyncio 与 Rust Tokio 在同线程嵌套调用导致死锁</div></div>
+      <div class="ph-toggle">▼</div>
+    </div>
+    <div class="ph-body open">
+      <div class="note n-y"><div class="nt2">问题</div>Python asyncio event loop 与 Tokio runtime 在同一线程内不能直接嵌套。如果在 Python async 函数中直接调用 PyO3 暴露的 Rust Future，会触发"Cannot run nested event loops"错误。</div>
+      <div class="note n-g"><div class="nt2">解法：独立 OS 线程隔离 + channel 通信</div>在独立 OS 线程中启动 Tokio runtime，通过 tokio::sync::mpsc channel 与 Python 侧通信。Python 通过 asyncio.get_event_loop().run_in_executor 调用包装函数，完全避免嵌套。MCTS 结果通过 Redis Stream 异步回传，不阻塞 WS 接收线程。</div>
+      <pre><span class="cc">// core/mcts_core.rs — Tokio 独立线程隔离</span>
+<span class="ck">pub fn</span> <span class="cv">spawn_mcts_runtime</span>() -> <span class="ca">MctsHandle</span> {
+    <span class="ck">let</span> (tx, rx) = mpsc::channel::<span class="ca">MctsJob</span>(<span class="co">64</span>);
+    std::thread::spawn(|| {
+        <span class="cc">// 独立 OS 线程，完全隔离于 Python asyncio loop</span>
+        <span class="ck">let</span> rt = Runtime::new().unwrap();
+        rt.block_on(<span class="ck">async</span> {
+            <span class="ck">while let</span> Some(job) = rx.recv().<span class="ck">await</span> {
+                tokio::spawn(run_mcts(job));  <span class="cc">// UCB1 树搜索</span>
+            }
+        });
+    });
+    MctsHandle { sender: tx }
+}</pre>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════ PAGE: RISKS ══════════════════════ -->
+<div id="pg-risks" class="pg">
+<div class="sec">
+  <div class="sh">综合风险矩阵（含 OKX 专属风险）</div>
+  <table class="rtable">
+    <tr><th>风险点</th><th>级别</th><th>触发条件</th><th>缓解措施</th><th>紧急回滚</th></tr>
+    <tr>
+      <td class="rh">SHM 读写竞争</td>
+      <td class="rv-r">高</td>
+      <td style="font-size:10px;color:var(--tx2)">Python 读取时 Rust 正在覆写同一缓冲页</td>
+      <td style="font-size:10px;color:var(--tx2)">Arc&lt;RwLock&gt; 读写锁 + 双缓冲 Ping-Pong 机制。Harness 监控 /proc/meminfo SHM 使用量，超 80% 告警。</td>
+      <td style="font-size:10px;color:var(--grn)">切回 Redis Stream 温路径，10s 内完成</td>
+    </tr>
+    <tr>
+      <td class="rh">MCTS 阻塞 WS 线程</td>
+      <td class="rv-r">高</td>
+      <td style="font-size:10px;color:var(--tx2)">Rollout 超时或 Python GIL 未在 allow_threads 中释放</td>
+      <td style="font-size:10px;color:var(--tx2)">Python::allow_threads 强制释放 GIL；Tokio 超时熔断（MCTS &gt;100ms 自动降级）；MCTS 与 WS 接收在不同 Tokio 任务中运行，互不阻塞。</td>
+      <td style="font-size:10px;color:var(--grn)">USE_TOKIO_MCTS=False，AlphaCast 直接输出</td>
+    </tr>
+    <tr>
+      <td class="rh">OKX 限频封禁</td>
+      <td class="rv-r">高</td>
+      <td style="font-size:10px;color:var(--tx2)">下单超过 20次/2s（错误码 50011），或 WS 订阅超限</td>
+      <td style="font-size:10px;color:var(--tx2)">令牌桶限流（18次/2s），Redis 全局计数器。接近阈值时低置信度信号自动丢弃。BehaviorHumanizer Poisson 随机化防模式识别。</td>
+      <td style="font-size:10px;color:var(--grn)">切 Demo 环境，降频至 1次/5s，等待解封</td>
+    </tr>
+    <tr>
+      <td class="rh">AI 推断延迟飙升</td>
+      <td class="rv-y">中</td>
+      <td style="font-size:10px;color:var(--tx2)">Triton 队列积压（&gt;100ms）或 GPU 降频（温控）</td>
+      <td style="font-size:10px;color:var(--tx2)">动态 batch 上限自适应调低；GPU 温度监控（&gt;80°C 告警）；降级为 CPU ONNXRuntime（延迟增加但不中断）。</td>
+      <td style="font-size:10px;color:var(--grn)">固定 conf=0.5，回退经验规则直接输出</td>
+    </tr>
+    <tr>
+      <td class="rh">CFL 标签分布偏移</td>
+      <td class="rv-y">中</td>
+      <td style="font-size:10px;color:var(--tx2)">市场 regime 切换（趋势→震荡），AlphaCast IC 骤降至 &lt;0.03</td>
+      <td style="font-size:10px;color:var(--tx2)">在线温度缩放 EMA 平滑；MetaLabeler 增量重训（7天滚动）；IC 衰减告警触发人工介入。</td>
+      <td style="font-size:10px;color:var(--grn)">冻结 G4，G1–G3 硬门控接管，减仓 50%</td>
+    </tr>
+    <tr>
+      <td class="rh">PyO3 ABI 兼容性</td>
+      <td class="rv-y">中</td>
+      <td style="font-size:10px;color:var(--tx2)">PyO3/maturin 版本升级导致 .so ABI 不兼容</td>
+      <td style="font-size:10px;color:var(--tx2)">CI 锁定 pyo3=0.21，Python=3.12，Rust=1.79。版本 bump 需完整回归测试才能合并。</td>
+      <td style="font-size:10px;color:var(--grn)">回退 .so 到上一稳定版本（保留 3 个历史版本）</td>
+    </tr>
+    <tr>
+      <td class="rh">TimescaleDB 迁移不完整</td>
+      <td class="rv-y">中</td>
+      <td style="font-size:10px;color:var(--tx2)">从 Redis ZSet 迁移 CFL 标签时时序乱序或重复</td>
+      <td style="font-size:10px;color:var(--tx2)">迁移脚本幂等插入（ON CONFLICT DO NOTHING）。迁移后对比计数，差值 &lt;0.1% 视为通过。</td>
+      <td style="font-size:10px;color:var(--grn)">labeler 回写 Redis，TimescaleDB 作只读备份</td>
+    </tr>
+    <tr>
+      <td class="rh">在线微调 T 系数震荡</td>
+      <td class="rv-y">中</td>
+      <td style="font-size:10px;color:var(--tx2)">小样本（N=50）在 regime 突变时更新方向不稳定</td>
+      <td style="font-size:10px;color:var(--tx2)">EMA 平滑（α=0.3），T ∈ [0.5, 3.0] 硬限制，连续 3 次反向则暂停并告警。</td>
+      <td style="font-size:10px;color:var(--grn)">T 固定 1.0，关闭在线微调，人工重启</td>
+    </tr>
+    <tr>
+      <td class="rh">SHM 内存泄漏</td>
+      <td class="rv-g">低</td>
+      <td style="font-size:10px;color:var(--tx2)">进程异常退出未 unlink /dev/shm 文件句柄</td>
+      <td style="font-size:10px;color:var(--tx2)">SharedBuffer 实现 Rust Drop trait 自动 unlink；启动脚本检测并清理残留 SHM 文件。</td>
+      <td style="font-size:10px;color:var(--grn)">手动 rm /dev/shm/qts_* 并重启服务</td>
+    </tr>
+    <tr>
+      <td class="rh">OKX 时间戳漂移</td>
+      <td class="rv-g">低</td>
+      <td style="font-size:10px;color:var(--tx2)">VPS 时钟偏移 &gt;30s 触发 50111 错误</td>
+      <td style="font-size:10px;color:var(--tx2)">启动时同步 OKX 服务器时间，每 5min 重新校准 time_offset。告警阈值设为偏移 &gt;10s（留 20s 缓冲）。</td>
+      <td style="font-size:10px;color:var(--grn)">手动触发 sync_time()，一般 &lt;5s 恢复</td>
+    </tr>
+  </table>
+</div>
+</div>
+
+<!-- ══════════════════════ PAGE: DAY1 ══════════════════════ -->
+<div id="pg-day1" class="pg">
+<div class="sec">
+  <div class="sh">Day 1–3 立即执行清单（不要等待完美架构）</div>
+  <div class="note n-g"><div class="nt2">原则</div>今天即可启动。目标：72 小时内跑通"OKX WS → Rust SHM → Python 零拷贝读取"数据流，并发送第一笔 OKX Demo 限价单。一切从最小可验证状态开始。</div>
+
+  <div class="d1-step">
+    <div class="d1-num">1</div>
+    <div class="d1-body">
+      <div class="d1-title">初始化仓库与 Protobuf 契约（Day 1 上午）</div>
+      <pre><span class="cc"># 初始化 Monorepo</span>
+mkdir qts_v8 && cd qts_v8
+cargo new v8_core_engine --lib
+uv init qts_python
+cp docker-compose.yml . <span class="cc"># Redis + TimescaleDB</span>
+
+<span class="cc"># 定义最小 Protobuf</span>
+mkdir schemas && <span class="ck">cat</span> > schemas/market_snapshot.proto << <span class="cs">'EOF'</span>
+syntax = "proto3";
+message MarketSnapshot {
+  string inst_id     = 1;
+  int64  ts_ns       = 2;
+  double last        = 3;
+  double bid1        = 4;
+  double ask1        = 5;
+  double bid1_sz     = 6;
+  double ask1_sz     = 7;
+  double funding_rate = 8;
+}
+<span class="cs">EOF</span>
+
+<span class="cc"># 双侧生成</span>
+cd v8_core_engine && cargo build   <span class="cc"># prost-build 自动生成 Rust 结构体</span>
+cd ../qts_python && python -m grpc_tools.protoc \
+  --python_out=. --pyi_out=. -I ../schemas \
+  ../schemas/market_snapshot.proto</pre>
+    </div>
+  </div>
+
+  <div class="d1-step">
+    <div class="d1-num">2</div>
+    <div class="d1-body">
+      <div class="d1-title">OKX WS → Rust → SHM 写入（Day 1 下午 - Day 2 上午）</div>
+      实现 <code>adapters/okx_ws.rs</code>，订阅 ETH-USDT-SWAP 的 <code>trades</code> 和 <code>books5</code>。每 25s 发送 ping 心跳，断线指数退避重连（1s / 2s / 4s）。解析后写入 <code>core/buffer.rs</code> 的 SHM 环形缓冲区，暴露 DLPack 指针。
+      <pre><span class="cc">// 验证命令：Python 侧零拷贝读取</span>
+python -c <span class="cs">"
+import v8_core_engine as vce, numpy as np
+bridge = vce.ShmBridge()
+arr = np.frombuffer(bridge.get_raw_ptr(30), dtype='f4')
+print('shape:', arr.reshape(-1, 15).shape)  # [30, 15]
+print('OBI:', arr[..., 5].mean())            # 订单簿不平衡均值
+"</span></pre>
+    </div>
+  </div>
+
+  <div class="d1-step">
+    <div class="d1-num">3</div>
+    <div class="d1-body">
+      <div class="d1-title">5m 窗口基础特征聚合（Day 2）</div>
+      <code>feature_engine.rs</code> 实现 <code>get_window(300)</code> 聚合 5m 窗口。输出基础 15 维：open/high/low/close/vol、OBI、OFI、Spread_Z、Depth_Imbalance、mom_1m/5m、HV_5m、Hurst、5m_close_event（布尔触发位）。验证输出与 Python 纯算版余弦相似度 &gt;0.99。
+    </div>
+  </div>
+
+  <div class="d1-step">
+    <div class="d1-num">4</div>
+    <div class="d1-body">
+      <div class="d1-title">OKX Demo API 第一笔限价单（Day 2 下午 - Day 3）</div>
+      申请 <a href="https://www.okx.com/simulated-trading" style="color:var(--py)">OKX Demo Trading API Key</a>（模拟盘，无真实资金）。用 Python <code>ccxt</code> 或 Rust <code>reqwest</code> 发送一笔 ETH-USDT-SWAP 限价单（方向随意，只验证签名链路），验证 <code>trace_id</code> 与 OKX <code>clOrdId</code> 绑定，查看订单状态 WS 回执。
+      <pre><span class="cc"># 快速验证（Python ccxt，后续迁移至 Rust）</span>
+<span class="ck">import</span> ccxt
+okx = ccxt.okx({<span class="cs">'apiKey'</span>: <span class="cs">'DEMO_KEY'</span>, <span class="cs">'secret'</span>: <span class="cs">'DEMO_SECRET'</span>,
+                <span class="cs">'password'</span>: <span class="cs">'DEMO_PASS'</span>, <span class="cs">'options'</span>: {<span class="cs">'defaultType'</span>: <span class="cs">'swap'</span>}})
+okx.set_sandbox_mode(<span class="ck">True</span>)  <span class="cc"># Demo 模拟盘</span>
+order = okx.create_limit_buy_order(<span class="cs">'ETH/USDT:USDT'</span>, <span class="co">0.01</span>, <span class="co">2000</span>,
+                                   {<span class="cs">'clOrdId'</span>: <span class="cs">'trace_001'</span>})
+print(order[<span class="cs">'id'</span>], order[<span class="cs">'status'</span>])</pre>
+    </div>
+  </div>
+
+  <div class="d1-step">
+    <div class="d1-num">5</div>
+    <div class="d1-body">
+      <div class="d1-title">Docker Compose 基础设施拉起（Day 1 并行）</div>
+      <pre><span class="cc"># docker-compose.yml 最小化版本</span>
+services:
+  redis:
+    image: redis:7.2-alpine
+    command: redis-server --maxmemory 16gb --maxmemory-policy allkeys-lru
+    ports: [<span class="cs">"6379:6379"</span>]
+  timescaledb:
+    image: timescale/timescaledb:2.14-pg16
+    environment:
+      POSTGRES_PASSWORD: qts_secret
+    ports: [<span class="cs">"5432:5432"</span>]
+  <span class="cc"># Triton 暂不启动，Phase 3 激活</span></pre>
+    </div>
+  </div>
+
+</div>
+
+<div class="sec">
+  <div class="sh">关键依赖版本锁定</div>
+  <table class="rtable">
+    <tr><th>组件</th><th>锁定版本</th><th>理由</th></tr>
+    <tr><td class="fn fn-r">Rust</td><td>1.79.0 (stable)</td><td>PyO3 0.21 ABI 稳定边界</td></tr>
+    <tr><td class="fn fn-r">PyO3 / maturin</td><td>0.21.x / 1.7.x</td><td>abi3-py312 feature，Python 3.12 兼容</td></tr>
+    <tr><td class="fn fn-p">Python</td><td>3.12.x</td><td>free-threaded GIL 实验性支持 + abi3</td></tr>
+    <tr><td class="fn fn-p">PyTorch</td><td>2.3.x + CUDA 12.4</td><td>dlpack 协议版本 + TorchScript 导出稳定</td></tr>
+    <tr><td class="fn fn-c">Triton Server</td><td>2.7.x</td><td>TorchScript backend 与 PyTorch 2.3 适配</td></tr>
+    <tr><td class="fn fn-p">Redis</td><td>7.2.x</td><td>AOF + Streams 双特性</td></tr>
+    <tr><td class="fn fn-a">TimescaleDB</td><td>2.14.x / PG16</td><td>hypertable compression + continuous aggregates</td></tr>
+    <tr><td class="fn fn-p">ccxt</td><td>4.3.x</td><td>OKX V5 API 稳定支持（过渡阶段用）</td></tr>
+    <tr><td class="fn fn-p">LightGBM</td><td>4.3.x</td><td>AlphaCast 替身模型 + MetaLabeler</td></tr>
+  </table>
+</div>
+</div>
+
+<script>
+function sw(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  const map={overview:0,phases:1,boundary:2,degrade:3,pitfalls:4,risks:5,day1:6};
+  document.querySelectorAll('.nt')[map[id]].classList.add('on');
+  window.scrollTo(0,0);
+}
+function toggle(head){
+  const body = head.nextElementSibling;
+  const arrow = head.querySelector('.ph-toggle');
+  const open = body.classList.toggle('open');
+  if(arrow) arrow.textContent = open ? '▲' : '▼';
+}
+</script>
+</body>
+</html>

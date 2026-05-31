@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QTS V8 · DeepSeek V4 Pro · Rust 执行计划</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#05080d;--bg1:#080c18;--bg2:#0c1122;--bg3:#10172e;
+  --bdr:#1a2640;--bdr2:#243255;--bdr3:#2e4070;
+  --tx1:#eef2f8;--tx2:#8ba3c4;--tx3:#3d5070;
+  --rust:#c084fc;--rust-d:#7e22ce;--rust-bg:#0d0318;--rust-lt:#e9d5ff;
+  --grn:#4ade80;--grn-bg:#06160d;--grn-d:#166534;
+  --ylw:#fbbf24;--ylw-bg:#160e00;--ylw-d:#92400e;
+  --red:#f87171;--red-bg:#150404;--red-d:#991b1b;
+  --proto:#2dd4bf;--proto-bg:#021a18;--proto-lt:#99f6e4;
+  --accent:#818cf8;
+  --warn:#fb923c;--warn-bg:#1a0800;--warn-d:#c2410c;
+}
+body{background:var(--bg0);color:var(--tx1);font-family:'SF Pro Text',-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;line-height:1.65}
+nav{position:sticky;top:0;z-index:100;background:rgba(5,8,13,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 18px;min-height:46px;gap:2px;overflow-x:auto}
+.logo{font-size:11px;font-weight:800;letter-spacing:.1em;padding-right:14px;margin-right:6px;border-right:1px solid var(--bdr);white-space:nowrap;background:linear-gradient(90deg,var(--rust),var(--warn));-webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0}
+.nt{padding:10px 11px;font-size:11px;font-weight:500;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.nt:hover{color:var(--tx2)}.nt.on{color:var(--tx1);border-color:var(--rust)}
+.pg{display:none;max-width:1080px;margin:0 auto;padding:20px 18px 72px}.pg.on{display:block}
+
+/* HERO */
+.hero{border:1px solid #3b0d6e;border-radius:16px;padding:26px 30px;margin-bottom:16px;background:linear-gradient(140deg,#0e0320 0%,#05080d 60%)}
+.hero h1{font-size:22px;font-weight:700;margin-bottom:6px;background:linear-gradient(90deg,var(--rust),var(--warn));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:12px;color:var(--tx2);line-height:1.85}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.tag{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600}
+.t-r{background:var(--rust-bg);color:var(--rust-lt);border:1px solid var(--rust-d)}
+.t-w{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-d)}
+.t-g{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-d)}
+.t-a{background:var(--proto-bg);color:var(--proto-lt);border:1px solid var(--proto)}
+
+/* CONTEXT BOX */
+.ctx{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.ctx-h{font-size:11px;font-weight:700;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.ctx-h::before{content:'';width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,var(--rust),var(--warn));display:inline-block}
+
+/* TASK CARD */
+.task{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.task-head{padding:13px 16px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;user-select:none}
+.t-num{flex-shrink:0;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--rust-bg);color:var(--rust-lt);border:1px solid var(--rust-d)}
+.t-meta{flex:1}
+.t-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.t-sub{font-size:11px;color:var(--tx2)}
+.t-phase{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--bdr3);color:var(--tx3);white-space:nowrap;flex-shrink:0}
+.t-toggle{font-size:14px;color:var(--tx3);transition:.2s;flex-shrink:0;margin-top:8px}
+.task-body{padding:0 16px 14px;display:none}
+.task-body.open{display:block}
+
+/* FILE TABLE */
+.ftable{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0 12px}
+.ftable th{padding:5px 9px;border-bottom:1px solid var(--bdr2);font-size:10px;font-weight:600;color:var(--tx3);letter-spacing:.04em;text-align:left}
+.ftable td{padding:6px 9px;border-bottom:1px solid #090e1c;vertical-align:top;line-height:1.55}
+.ftable tr:last-child td{border-bottom:none}
+.ftable tr:hover td{background:#080d1a}
+.fn{font-family:'JetBrains Mono','Fira Code',monospace;font-size:10px;font-weight:600;color:var(--rust-lt)}
+.fn-p{color:#bae6fd}.fn-t{color:var(--proto-lt)}
+.lb{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px}
+.lb-r{background:var(--rust-bg);color:var(--rust-lt)}.lb-p{background:#03111f;color:#bae6fd}
+.lb-g{background:var(--grn-bg);color:var(--grn)}.lb-y{background:var(--ylw-bg);color:var(--ylw)}
+
+/* NOTE */
+.note{border-radius:8px;padding:10px 13px;margin:8px 0;font-size:11px;line-height:1.7}
+.n-r{background:var(--rust-bg);border:1px solid var(--rust-d)}.n-r .nt2{color:var(--rust-lt)}
+.n-g{background:var(--grn-bg);border:1px solid var(--grn-d)}.n-g .nt2{color:var(--grn)}
+.n-y{background:var(--ylw-bg);border:1px solid var(--ylw-d)}.n-y .nt2{color:var(--ylw)}
+.n-w{background:var(--warn-bg);border:1px solid var(--warn-d)}.n-w .nt2{color:var(--warn)}
+.n-a{background:var(--proto-bg);border:1px solid var(--proto)}.n-a .nt2{color:var(--proto-lt)}
+.nt2{font-weight:700;margin-bottom:3px}
+
+/* CODE */
+pre{background:#030508;border:1px solid var(--bdr2);border-radius:8px;padding:12px 15px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:10.5px;line-height:1.75;overflow-x:auto;margin:8px 0 12px}
+.ck{color:#818cf8}.cv{color:#f472b6}.cs{color:#34d399}.cc{color:#2d3f55;font-style:italic}.co{color:#fb923c}.ca{color:var(--rust-lt)}.cx{color:var(--proto-lt)}
+
+/* AR */
+.ar-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ar-box{border-radius:7px;padding:9px 12px;font-size:10px;line-height:1.7}
+.ar-ok{background:#04100a;border:1px solid #166534}.ar-ok .ar-t{color:#86efac;font-weight:700;margin-bottom:3px}
+.ar-rb{background:var(--red-bg);border:1px solid var(--red-d)}.ar-rb .ar-t{color:#fca5a5;font-weight:700;margin-bottom:3px}
+.ar-if{background:#08101e;border:1px solid var(--bdr3)}.ar-if .ar-t{color:var(--accent);font-weight:700;margin-bottom:3px}
+.ar-body{color:var(--tx2)}
+
+/* INTERFACE BOX */
+.iface{background:#040a14;border:1px solid var(--bdr3);border-radius:8px;padding:11px 14px;margin:8px 0;font-size:11px}
+.iface-t{font-size:10px;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:.04em}
+
+/* SECTION */
+.sec{margin-bottom:20px}
+.sh{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:7px}
+.sh::before{content:'';width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,var(--rust),var(--warn));display:inline-block}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:7px;margin-bottom:16px}
+.stat{background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:10px;text-align:center}
+.sv{font-size:17px;font-weight:700;font-family:monospace;margin-bottom:2px}
+.sl{font-size:9px;color:var(--tx3)}
+
+@media(max-width:660px){.g2,.ar-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">DEEPSEEK · RUST · PLAN</div>
+  <span class="nt on" onclick="sw('ctx')">📖 背景与职责</span>
+  <span class="nt" onclick="sw('tasks')">📋 任务清单</span>
+  <span class="nt" onclick="sw('iface')">🔌 接口契约</span>
+  <span class="nt" onclick="sw('collab')">🤝 与Qwen协作</span>
+  <span class="nt" onclick="sw('rules')">⚠️ 执行规则</span>
+</nav>
+
+<!-- ══ PAGE: 背景 ══ -->
+<div id="pg-ctx" class="pg on">
+<div class="hero">
+  <h1>DeepSeek V4 Pro · Rust 热路径执行计划</h1>
+  <div class="hero-sub">
+    你负责 QTS V8 系统的底层 Rust 核心，你的代码是整个系统的性能基石。<br>
+    另一位 AI（Qwen 3.7 Max）负责 Python 侧的 AI 模型、策略与编排，双方代码最终合并为同一个系统。<br>
+    本文档包含你需要了解的全部背景、所有任务、对外接口契约、与 Qwen 的协作边界，以及执行规则。
+  </div>
+  <div class="tags">
+    <span class="tag t-r">Rust 1.79 (stable)</span>
+    <span class="tag t-r">PyO3 0.21 + maturin</span>
+    <span class="tag t-w">tokio-tungstenite</span>
+    <span class="tag t-w">simd-json · memmap2</span>
+    <span class="tag t-g">OKX ETH-USDT-SWAP</span>
+    <span class="tag t-a">Protobuf (prost)</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="sv" style="color:var(--rust)">7</div><div class="sl">Rust 文件</div></div>
+  <div class="stat"><div class="sv" style="color:var(--warn)">&lt;1μs</div><div class="sl">SHM 热路径目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--grn)">&lt;5μs</div><div class="sl">HMAC 签名目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--accent)">&lt;50ms</div><div class="sl">MCTS 全量目标</div></div>
+  <div class="stat"><div class="sv" style="color:var(--ylw)">1 个</div><div class="sl">编译产物 .so</div></div>
+  <div class="stat"><div class="sv" style="color:var(--grn)">Phase 0–4</div><div class="sl">你的交付周期</div></div>
+</div>
+
+<div class="sec">
+  <div class="sh">系统全貌：你在整体中的位置</div>
+  <div class="ctx">
+    <div class="ctx-h">QTS V8 系统是什么</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      QTS V8（Quantitative Trading System Version 8）是一套针对 OKX ETH-USDT 永续合约（5分钟周期）的量化交易系统。系统采用 <strong style="color:var(--tx1)">Rust + Python 混合双核架构</strong>：<br><br>
+      • <strong style="color:var(--rust-lt)">Rust 侧（你负责）</strong>：处理所有延迟敏感的热路径——WebSocket 数据接收、共享内存缓冲、特征计算、订单签名下单、订单状态机、MCTS 树搜索核心。<br>
+      • <strong style="color:#bae6fd">Python 侧（Qwen 负责）</strong>：处理 AI 模型推断（ResNet/AlphaCast）、策略逻辑（Alpha 引擎）、门控风控、Harness 编排、监控告警、标签积累。<br><br>
+      两侧通过三种机制通信：① <strong style="color:var(--proto-lt)">Protobuf 契约层</strong>（schemas/*.proto，所有数据结构的唯一来源）；② <strong style="color:var(--rust-lt)">SHM 共享内存</strong>（Rust 写入，Python 通过 DLPack 零拷贝读取）；③ <strong style="color:#bae6fd">Redis 温路径</strong>（跨进程信号、MCTS 结果缓存）。<br><br>
+      你的所有 Rust 模块最终编译为 <code style="color:var(--rust-lt)">v8_core_engine.so</code>，Python 侧通过 <code>import v8_core_engine as vce</code> 调用。
+    </div>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">开发阶段与你的交付时序</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      整个项目分 6 个 Phase（Phase 0–5），你主要负责 <strong style="color:var(--rust-lt)">Phase 0–4</strong> 的 Rust 模块交付：<br><br>
+      <strong style="color:var(--proto-lt)">Phase 0（Week 1）</strong>：基建期。你交付：Cargo workspace 初始化、prost-build 从 .proto 生成 Rust 结构体、OKX WS 接入（okx_ws.rs）。<br>
+      <strong style="color:var(--grn)">Phase 1（Week 2–3）</strong>：MVP 最小闭环。你交付：SHM 环形缓冲（buffer.rs）、5m 特征引擎（feature_engine.rs）、OKX 签名下单（exec_channels.rs）、订单状态机（order_state.rs）、PyO3 主入口（lib.rs）。<br>
+      <strong style="color:var(--ylw)">Phase 2（Week 4–5）</strong>：等待 Qwen 的 ResNet 模型，你无新 Rust 任务，但需配合 Qwen 调试 SHM 桥接延迟。<br>
+      <strong style="color:var(--rust)">Phase 3（Week 6）</strong>：Triton 接入期，你无新 Rust 任务，配合验证 .so 接口。<br>
+      <strong style="color:var(--red)">Phase 4（Week 7）</strong>：你交付最复杂模块 mcts_core.rs（Tokio UCB1 树搜索）。<br><br>
+      <strong style="color:var(--warn)">重要</strong>：Phase 1 的所有 Rust 模块必须在 Week 3 结束前全部编译通过并提供给 Qwen 测试，否则 Qwen 的 Python 策略层无法运行。
+    </div>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">你不需要做什么（Qwen 的领域）</div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.8">
+      以下内容<strong style="color:var(--red)">不属于你的职责</strong>，不要在你的 Rust 代码中引入对应逻辑：<br><br>
+      ✗ AI 模型逻辑（PyTorch/ONNX/Triton 推断）——Qwen 负责<br>
+      ✗ 策略规则（OBI 阈值、门控参数）——Qwen 负责<br>
+      ✗ Harness 编排（pipeline_v1.py）——Qwen 负责<br>
+      ✗ TimescaleDB 标签写入——Qwen 负责<br>
+      ✗ 监控仪表盘（FastAPI/WebSocket）——Qwen 负责<br><br>
+      你的 Rust 代码只需要：通过 PyO3 暴露清晰的函数接口，Qwen 的 Python 代码会调用这些接口。接口签名在"接口契约"页有完整定义，严格遵守，不得单方面修改。
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ PAGE: 任务 ══ -->
+<div id="pg-tasks" class="pg">
+<div class="sec">
+  <div class="sh">Phase 0 · Week 1 · 基建与契约</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T0-1</div>
+      <div class="t-meta">
+        <div class="t-title">Cargo Workspace 初始化 + prost-build 代码生成</div>
+        <div class="t-sub">Monorepo 骨架 · 从 .proto 生成 Rust 结构体 · maturin 编译验证</div>
+      </div>
+      <span class="t-phase">Phase 0 · Day 1</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body open">
+      <div class="note n-r"><div class="nt2">任务说明</div>初始化整个 Rust crate，配置 PyO3 + maturin，设置 build.rs 让 prost-build 从 schemas/*.proto 自动生成 Rust 数据结构。这是所有后续任务的前提。</div>
+      <div class="ftable-wrapper">
+      <table class="ftable">
+        <tr><th>交付文件</th><th>关键内容</th></tr>
+        <tr><td class="fn">v8_core_engine/Cargo.toml</td><td style="font-size:10px;color:var(--tx2)">crate-type = ["cdylib"]；依赖：pyo3(0.21, abi3-py312)、tokio(full)、prost(0.12)、simd-json(0.13)、memmap2(0.9)、redis(0.25, tokio-comp)、ring(hmac)、reqwest(tls)、tokio-tungstenite</td></tr>
+        <tr><td class="fn">v8_core_engine/build.rs</td><td style="font-size:10px;color:var(--tx2)">prost_build::compile_protos(&["../schemas/market_snapshot.proto","../schemas/unified_order.proto","../schemas/alpha_signal.proto","../schemas/alphacast_output.proto"], &["../schemas/"])</td></tr>
+        <tr><td class="fn">v8_core_engine/src/lib.rs</td><td style="font-size:10px;color:var(--tx2)">仅做 PyO3 模块注册骨架，#[pymodule] fn v8_core_engine(m: &PyModule)；其余模块 mod 声明。能被 maturin develop --release 编译通过即达标。</td></tr>
+      </table>
+      </div>
+      <pre><span class="cc"># 验收命令（Week 1 Day 1 结束前必须通过）</span>
+cd v8_core_engine
+maturin develop --release
+python -c <span class="cs">"import v8_core_engine; print('OK')"</span></pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">maturin develop --release 零报错；Python 能 import v8_core_engine；prost 生成的 MarketSnapshot 结构体在 src/proto_gen/ 目录下可见</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 交付给 Qwen 的内容</div><div class="ar-body">编译好的 v8_core_engine.so 路径；lib.rs 中已注册的 PyO3 类名列表（即使函数体为空）；Cargo.toml 中的依赖版本</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T0-2</div>
+      <div class="t-meta">
+        <div class="t-title">OKX WebSocket 接入 (okx_ws.rs)</div>
+        <div class="t-sub">tokio-tungstenite · 心跳 · 自动重连 · ETH-USDT-SWAP 订阅</div>
+      </div>
+      <span class="t-phase">Phase 0 · Day 2–3</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-r"><div class="nt2">任务说明</div>实现 OKX 公共 WebSocket 接入，稳定接收 ETH-USDT-SWAP 的 trades、books5、candle5m 数据，解析后写入共享内存（此时 buffer.rs 尚未完成，先写入临时 Vec，T0-2 和 T1-1 完成后联调）。</div>
+      <table class="ftable">
+        <tr><th>交付文件</th><th>关键实现要点</th></tr>
+        <tr><td class="fn">adapters/okx_ws.rs</td><td style="font-size:10px;color:var(--tx2)">WS URL: wss://ws.okx.com:8443/ws/v5/public。订阅频道：["trades","books5","candle5m"]，instId: ETH-USDT-SWAP。心跳：每 25s 发送 {"op":"ping"}，收到 pong 重置计时器，否则主动断线重连。断线重连：指数退避 1s/2s/4s/8s，最大 30s，连接成功后重置。</td></tr>
+      </table>
+      <pre><span class="cc">// OKX WS 消息格式（simd_json 极速解析，避免全量反序列化）</span>
+<span class="cc">// books5 推送格式：{"arg":{"channel":"books5","instId":"ETH-USDT-SWAP"},"data":[[bids, asks, ts, ...]}</span>
+<span class="cc">// trades 推送格式：{"data":[{"instId":"ETH-USDT-SWAP","px":"2000.5","sz":"0.1","side":"buy","ts":"..."}]}</span>
+
+<span class="ck">pub struct</span> <span class="ca">OkxWsClient</span> {
+    url: String,
+    reconnect_delay: Duration,
+    tx: mpsc::Sender&lt;<span class="ca">MarketSnapshot</span>&gt;,   <span class="cc">// 解析结果发往 buffer.rs</span>
+}
+
+<span class="ck">impl</span> <span class="ca">OkxWsClient</span> {
+    <span class="ck">pub async fn</span> <span class="cv">run</span>(&<span class="ck">mut</span> self) { <span class="cc">/* 主循环：connect → subscribe → recv → parse → send */</span> }
+    <span class="ck">async fn</span> <span class="cv">send_heartbeat</span>(&self) { <span class="cc">/* {"op":"ping"} */</span> }
+    <span class="ck">async fn</span> <span class="cv">subscribe</span>(&self) { <span class="cc">/* {"op":"subscribe","args":[{"channel":"books5","instId":"ETH-USDT-SWAP"},...]} */</span> }
+    <span class="ck">fn</span> <span class="cv">parse_message</span>(&self, raw: &[u8]) -> <span class="ca">Option</span>&lt;<span class="ca">MarketSnapshot</span>&gt; { <span class="cc">/* simd_json 解析 */</span> }
+}</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">连续运行 30min 无断线；手动 kill 网络连接后 3s 内自动重连；每秒至少收到 1 条 trades 消息；simd_json 解析无 panic</div></div>
+        <div class="ar-box ar-rb"><div class="ar-t">⚠️ OKX 专属注意</div><div class="ar-body">OKX WS 推送格式是嵌套数组 [[{...}]]，不是直接对象。books5 的 bids/asks 是字符串数组，需转 f64。时间戳字段 ts 是毫秒字符串，需 parse::<i64>()</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 1 · Week 2–3 · MVP 核心热路径（最重要）</div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-1</div>
+      <div class="t-meta">
+        <div class="t-title">SHM 环形缓冲区 (buffer.rs) — 最高优先级</div>
+        <div class="t-sub">mmap2 · Arc&lt;RwLock&gt; · DLPack 接口 · Python 零拷贝桥接基础</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2 优先</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body open">
+      <div class="note n-y"><div class="nt2">为什么最高优先级</div>Qwen 的 shm_bridge.py、ResNet、特征读取全部依赖这个文件。T1-1 是 Phase 1 的关键路径，必须最先完成，其他任务可并行推进。</div>
+      <table class="ftable">
+        <tr><th>交付文件</th><th>必须实现的接口（PyO3 暴露给 Python）</th></tr>
+        <tr><td class="fn">core/buffer.rs</td><td style="font-size:10px;color:var(--tx2)">内部结构：mmap2 分配 /dev/shm/qts_eth5m，容量 3600 个 MarketSnapshot 槽位（约 3600×200bytes=720KB）。Arc&lt;RwLock&lt;CircularBuffer&gt;&gt; 线程安全。双缓冲 Ping-Pong 防止读写竞争。</td></tr>
+      </table>
+      <div class="iface">
+        <div class="iface-t">PyO3 暴露接口（Qwen 会调用这些，不得修改签名）</div>
+        <pre style="margin:0;font-size:10px"><span class="cc"># Python 调用方式（Qwen 的 shm_bridge.py）</span>
+bridge = vce.ShmBridge()                    <span class="cc"># 构造，连接 /dev/shm/qts_eth5m</span>
+dlpack = bridge.get_window(secs=60)         <span class="cc"># 返回最近 60s 的数据 DLPack 指针</span>
+(ptr, shape) = bridge.get_raw_ptr(secs=30)  <span class="cc"># 返回 (raw_ptr: int, shape: tuple)</span>
+bridge.get_latest() -> MarketSnapshotPy     <span class="cc"># 返回最新一条 snapshot 的 Python 对象</span></pre>
+      </div>
+      <pre><span class="cc">// Rust 侧实现骨架</span>
+#[<span class="cv">pyclass</span>]
+<span class="ck">pub struct</span> <span class="ca">ShmBridge</span> {
+    buf: Arc&lt;RwLock&lt;<span class="ca">CircularBuffer</span>&gt;&gt;,
+}
+#[<span class="cv">pymethods</span>]
+<span class="ck">impl</span> <span class="ca">ShmBridge</span> {
+    #[<span class="cv">new</span>]
+    <span class="ck">pub fn</span> <span class="cv">new</span>() -> <span class="ca">PyResult</span>&lt;Self&gt; { <span class="cc">/* mmap2 初始化 */</span> }
+
+    <span class="ck">pub fn</span> <span class="cv">get_window</span>(&self, py: <span class="ca">Python</span>, secs: u32) -> <span class="ca">PyResult</span>&lt;<span class="ca">PyObject</span>&gt; {
+        py.<span class="cv">allow_threads</span>(|| { <span class="cc">/* 释放 GIL */</span> });
+        <span class="cc">// 返回 DLPack capsule，Python 用 torch.from_dlpack() 接收</span>
+    }
+
+    <span class="ck">pub fn</span> <span class="cv">get_raw_ptr</span>(&self, secs: u32) -> (usize, (usize, usize)) {
+        <span class="cc">// 返回 (指针地址 as usize, (行数, 列数)) 供 np.frombuffer 使用</span>
+    }
+}</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">Python np.frombuffer(bridge.get_raw_ptr(30)) 读取延迟 &lt;1μs (p99)；Arc&lt;RwLock&gt; 压测下无 deadlock；进程退出时 Drop trait 自动 unlink /dev/shm/qts_eth5m；shape 正确 [T, 50]</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 Qwen 依赖此接口</div><div class="ar-body">完成后立即将 ShmBridge 类注册到 lib.rs 并重新编译 .so，通知 Qwen 可以开始写 shm_bridge.py 和 resnet_encoder.py</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-2</div>
+      <div class="t-meta">
+        <div class="t-title">5m 特征引擎 (feature_engine.rs)</div>
+        <div class="t-sub">50 维特征计算 · 5m 预计算策略（抢跑防护）· &lt;1μs 目标</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-r"><div class="nt2">5m 预计算策略（OKX 专属，必须实现）</div>OKX WS 推送 5m 闭合事件有网络延迟。必须在 5m 周期结束前 200ms 提前预计算 99% 特征，闭盘瞬间仅做 O(1) 的 close 价格修正，立即触发 Alpha 评估事件写入 Redis。</div>
+      <table class="ftable">
+        <tr><th>特征分组</th><th>具体特征（共 50 维）</th></tr>
+        <tr><td><span class="lb lb-r">Velocity (12维)</span></td><td style="font-size:10px;color:var(--tx2)">5m/15m/1h 收益率各 × 2（返回率 + 加速度）= 12维</td></tr>
+        <tr><td><span class="lb lb-r">Micro (18维)</span></td><td style="font-size:10px;color:var(--tx2)">OBI（订单簿不平衡）、OFI（订单流不平衡）、Spread_Z（点差 Z-score）、Depth_Imbalance（深度不平衡）、bid1/ask1/bid1_sz/ask1_sz、成交量加权价格、买卖成交量比 × 多窗口 = 18维</td></tr>
+        <tr><td><span class="lb lb-r">Regime (12维)</span></td><td style="font-size:10px;color:var(--tx2)">Hurst 指数（R/S法）、5m/15m/1h Realized Volatility、Garman-Klass 波动率、ATR、布林带宽度 × 多窗口 = 12维</td></tr>
+        <tr><td><span class="lb lb-r">OHLCV (8维)</span></td><td style="font-size:10px;color:var(--tx2)">open/high/low/close/vol、5m 成交量变化率、资金费率（轮询更新）、资金费率 8h 累积 = 8维</td></tr>
+      </table>
+      <div class="iface">
+        <div class="iface-t">PyO3 暴露接口（Qwen 调用）</div>
+        <pre style="margin:0;font-size:10px">engine = vce.FeatureEngine()
+engine.on_tick(snapshot_bytes: bytes)       <span class="cc"># 每次 WS tick 调用</span>
+event = engine.on_5m_close()               <span class="cc"># 5m 闭合时调用，返回 BarCloseEvent</span>
+arr = engine.get_features_50d() -> bytes    <span class="cc"># 获取当前 50d 特征，供写入 SHM</span></pre>
+      </div>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">单次特征计算 &lt;1μs；与 Python NumPy 参考实现余弦相似度 &gt;0.99；预计算在闭盘前 200ms 触发；Hurst 指数数值范围 [0, 1] 合理</div></div>
+        <div class="ar-box ar-rb"><div class="ar-t">⚠️ 注意</div><div class="ar-body">资金费率字段由 Python 侧定时 REST 轮询后通过 Redis 写入，Rust 侧从 Redis 读取填充到第 50 维，不要在 Rust 侧实现 REST 轮询</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-3</div>
+      <div class="t-meta">
+        <div class="t-title">OKX 执行通道 (exec_channels.rs)</div>
+        <div class="t-sub">HMAC-SHA256 签名 · Token Bucket 限流 · BehaviorHumanizer · 时间戳补偿</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 2–3</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-w"><div class="nt2">四个 OKX 专属机制（必须全部实现）</div></div>
+      <div class="g2">
+        <div class="note n-r" style="margin:0">
+          <div class="nt2">① 时间戳防重放（50111错误）</div>
+          启动时通过 GET /api/v5/public/time 获取 OKX 服务器时间，计算 time_offset = okx_ts - local_ts 存入 AtomicI64。所有请求时间戳 = SystemTime::now_ns() + time_offset。每 5min 重新同步一次。
+        </div>
+        <div class="note n-r" style="margin:0">
+          <div class="nt2">② HMAC-SHA256 签名（&lt;5μs）</div>
+          prehash = timestamp + method.to_uppercase() + request_path + body。使用 ring crate HMAC-SHA256 签名，Base64 编码。Header: OK-ACCESS-KEY, OK-ACCESS-SIGN, OK-ACCESS-TIMESTAMP, OK-ACCESS-PASSPHRASE。
+        </div>
+        <div class="note n-y" style="margin:0">
+          <div class="nt2">③ Token Bucket 限流（OKX 20次/2s）</div>
+          Rust 侧实现令牌桶（速率 18次/2s，留 10% 余量）。Redis INCR + EXPIRE(2) 维护滑动窗口计数器。接近阈值时低置信度（conf &lt; 0.7）信号自动丢弃并写告警到 Redis。
+        </div>
+        <div class="note n-y" style="margin:0">
+          <div class="nt2">④ BehaviorHumanizer（防机器人识别）</div>
+          下单前注入 Poisson 随机延迟（均值 0.3s，范围 0.1–0.5s）。价格微扰 ±0.002（Limit Order 专属）。通过 tokio::time::sleep 实现，不阻塞其他异步任务。
+        </div>
+      </div>
+      <div class="iface" style="margin-top:10px">
+        <div class="iface-t">PyO3 暴露接口（Qwen 调用）</div>
+        <pre style="margin:0;font-size:10px">channel = vce.OkxChannel(api_key, secret, passphrase, is_demo=True)
+receipt = await channel.place_order(order_bytes: bytes)  <span class="cc"># UnifiedOrder protobuf</span>
+ok = await channel.cancel_order(ord_id: str)
+channel.sync_time()                                       <span class="cc"># 手动触发时间同步</span></pre>
+      </div>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">OKX Demo 模拟盘成功下单，返回正确 ordId；HMAC 签名 &lt;5μs；Token Bucket 压测下无 50011 错误；time_offset 计算偏差 &lt;100ms</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 交付给 Qwen</div><div class="ar-body">OkxChannel 类注册到 lib.rs 后重新编译 .so；告知 Qwen order_bytes 的 Protobuf 格式（UnifiedOrder.proto 字段说明）</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-4</div>
+      <div class="t-meta">
+        <div class="t-title">订单状态机 (order_state.rs)</div>
+        <div class="t-sub">FSM · 原子操作 · WS 订阅 orders 频道 · 防并发死锁</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 3</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <table class="ftable">
+        <tr><th>状态转换</th><th>触发条件</th><th>副作用</th></tr>
+        <tr><td class="fn" style="color:var(--grn)">NEW</td><td style="font-size:10px;color:var(--tx2)">Python 侧调用 place_order</td><td style="font-size:10px;color:var(--tx2)">写入 Redis orders:pending SET</td></tr>
+        <tr><td class="fn" style="color:var(--ylw)">POSTED</td><td style="font-size:10px;color:var(--tx2)">OKX REST 返回 ordId</td><td style="font-size:10px;color:var(--tx2)">更新 Redis orders:{ordId} Hash</td></tr>
+        <tr><td class="fn" style="color:var(--warn)">PARTIAL</td><td style="font-size:10px;color:var(--tx2)">WS orders 频道推送部分成交</td><td style="font-size:10px;color:var(--tx2)">更新成交量，发送部分成交事件到 Redis Stream</td></tr>
+        <tr><td class="fn" style="color:var(--rust)">FILLED</td><td style="font-size:10px;color:var(--tx2)">WS 推送全量成交</td><td style="font-size:10px;color:var(--tx2)">写 P&L 事件到 Redis Stream pnl:events</td></tr>
+        <tr><td class="fn" style="color:var(--red)">CANCELED</td><td style="font-size:10px;color:var(--tx2)">WS 推送撤单或超时主动撤</td><td style="font-size:10px;color:var(--tx2)">清理 Redis，写告警</td></tr>
+      </table>
+      <div class="note n-r"><div class="nt2">关键：trace_id 绑定</div>每个订单必须携带来自 Python 侧的 trace_id，在所有状态变更的 Redis 写入中保持 trace_id 不变，供 Qwen 的 logging_handler.py 做全链路追踪。OKX clOrdId 字段 = trace_id 的前 32 位（OKX 限制 clOrdId ≤ 32字符）。</div>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">Rust 枚举穷举所有状态，编译时无遗漏分支警告；并发 100 个订单压测无 panic；FILLED 事件 100% 写入 Redis Stream pnl:events；trace_id 全程保持</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 Qwen 依赖</div><div class="ar-body">Redis Stream pnl:events 的消息格式（字段名列表）；orders:{ordId} Hash 的字段结构；Qwen 的 pnl_aggregator.py 从这里读取数据</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T1-5</div>
+      <div class="t-meta">
+        <div class="t-title">PyO3 主入口整合 (lib.rs)</div>
+        <div class="t-sub">注册所有类 · GIL 释放策略 · .pyi 存根文件</div>
+      </div>
+      <span class="t-phase">Phase 1 · Week 3 末</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-r"><div class="nt2">任务说明</div>将 T0-1 到 T1-4 所有 PyO3 类整合注册，确保 GIL 策略一致（所有计算密集方法均使用 py.allow_threads），生成 v8_core_engine.pyi 类型存根供 Qwen 的 IDE 补全和 mypy 检查。</div>
+      <pre><span class="cc">// lib.rs 最终结构</span>
+#[<span class="cv">pymodule</span>]
+<span class="ck">fn</span> <span class="cv">v8_core_engine</span>(m: &<span class="ca">Bound</span>&lt;'_, <span class="ca">PyModule</span>&gt;) -> <span class="ca">PyResult</span>&lt;()&gt; {
+    m.<span class="cv">add_class</span>::&lt;<span class="ca">ShmBridge</span>&gt;()?;        <span class="cc">// T1-1</span>
+    m.<span class="cv">add_class</span>::&lt;<span class="ca">FeatureEngine</span>&gt;()?;     <span class="cc">// T1-2</span>
+    m.<span class="cv">add_class</span>::&lt;<span class="ca">OkxChannel</span>&gt;()?;        <span class="cc">// T1-3</span>
+    m.<span class="cv">add_class</span>::&lt;<span class="ca">OrderFSM</span>&gt;()?;          <span class="cc">// T1-4</span>
+    m.<span class="cv">add_class</span>::&lt;<span class="ca">MctsPool</span>&gt;()?;          <span class="cc">// T4-1（Phase 4 补充）</span>
+    <span class="ca">Ok</span>(())
+}</pre>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ Phase 1 总验收</div><div class="ar-body">v8_core_engine.so 包含所有 Phase 1 类；v8_core_engine.pyi 字段完整；Qwen 拿到 .so 后能在 30min 内跑通 shm_bridge.py 读取 SHM 数据</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 Phase 1 交付包</div><div class="ar-body">v8_core_engine.so（附编译环境说明）；v8_core_engine.pyi（完整类型存根）；Redis Key 命名规范文档（所有 Rust 侧写入的 Key）；MarketSnapshot 字段说明</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">Phase 4 · Week 7 · Tokio MCTS（最复杂）</div>
+  <div class="task">
+    <div class="task-head" onclick="toggle(this)">
+      <div class="t-num">T4-1</div>
+      <div class="t-meta">
+        <div class="t-title">Tokio 异步 MCTS 核心 (mcts_core.rs)</div>
+        <div class="t-sub">UCB1 树搜索 · 8 worker 并发 · PyO3 Rollout 回调 · asyncio/Tokio 隔离</div>
+      </div>
+      <span class="t-phase">Phase 4 · Week 7</span>
+      <div class="t-toggle">▼</div>
+    </div>
+    <div class="task-body">
+      <div class="note n-w"><div class="nt2">asyncio/Tokio 隔离（必须按此实现，否则 Python 侧必定死锁）</div>在独立 OS 线程中启动 Tokio runtime（std::thread::spawn），通过 tokio::sync::mpsc channel 与 Python asyncio 通信。禁止在 Python async 上下文内直接调用 PyO3 暴露的 Tokio Future——Qwen 的 mcts_worker.py 会通过 asyncio.get_event_loop().run_in_executor 调用你的接口。</div>
+      <table class="ftable">
+        <tr><th>参数</th><th>配置值</th><th>说明</th></tr>
+        <tr><td>动作空间</td><td>buy / sell / hold / close × 5档仓位</td><td style="font-size:10px;color:var(--tx2)">= 20 个离散动作</td></tr>
+        <tr><td>Worker 数量</td><td>8 个 Tokio 并发任务</td><td style="font-size:10px;color:var(--tx2)">不要超过 CPU 核数 / 2</td></tr>
+        <tr><td>模拟次数</td><td>200–1000（可配置）</td><td style="font-size:10px;color:var(--tx2)">通过 mcts_config.py 传入</td></tr>
+        <tr><td>Rollout 深度</td><td>N=5–20步（可配置）</td><td style="font-size:10px;color:var(--tx2)">每步调用 AlphaCast 推断</td></tr>
+        <tr><td>奖励函数</td><td>Sharpe 加权 · γ=0.95 · λ=0.3</td><td style="font-size:10px;color:var(--tx2)">reward = ŷ / σ × γ^t - λ×risk</td></tr>
+        <tr><td>超时熔断</td><td>100ms 自动降级</td><td style="font-size:10px;color:var(--tx2)">超时返回 AlphaCast 直接结果</td></tr>
+      </table>
+      <div class="iface">
+        <div class="iface-t">PyO3 暴露接口（Qwen 的 mcts_worker.py 调用）</div>
+        <pre style="margin:0;font-size:10px">pool = vce.MctsPool(workers=8, timeout_ms=100)
+<span class="cc"># Qwen 通过 run_in_executor 调用（不是 await）</span>
+result_bytes = pool.run_sync(state_bytes, rollout_fn)
+<span class="cc"># state_bytes: 当前市场状态 protobuf</span>
+<span class="cc"># rollout_fn: Python callable，Qwen 实现，调用 Triton AlphaCast</span>
+<span class="cc"># result_bytes: MctsResult protobuf（best_action, path_value, sharpe_estimate）</span></pre>
+      </div>
+      <div class="ar-grid">
+        <div class="ar-box ar-ok"><div class="ar-t">✓ 验收标准</div><div class="ar-body">200次模拟 &lt;50ms；8 worker 并发压测无死锁；超时自动降级返回默认 hold 动作；Python run_in_executor 调用无嵌套 event loop 报错；结果写 Redis mcts:result:{trace_id}（TTL=30s）</div></div>
+        <div class="ar-box ar-if"><div class="ar-t">📤 与 Qwen 联调</div><div class="ar-body">完成后提供一个 mock rollout_fn（始终返回 {ŷ:0.001, σ:0.0005, conf:0.6}）让 Qwen 在 mcts_worker.py 中验证调用链路；联调通过后 Qwen 替换为真实 Triton 推断</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ PAGE: 接口 ══ -->
+<div id="pg-iface" class="pg">
+<div class="sec">
+  <div class="sh">对外接口完整契约（与 Qwen 约定，不得单方面修改）</div>
+  <div class="note n-a"><div class="nt2">契约原则</div>以下接口是你（Rust）和 Qwen（Python）之间的唯一协议。任何一方需要修改接口，必须先在共享文档中提出变更申请，双方确认后同步修改——不得单方面改变函数签名、参数类型或 Redis Key 名称。</div>
+
+  <div class="ctx">
+    <div class="ctx-h">PyO3 类接口总表</div>
+    <table class="ftable">
+      <tr><th>类名</th><th>方法</th><th>参数</th><th>返回值</th><th>Qwen 调用位置</th></tr>
+      <tr><td class="fn">ShmBridge</td><td class="fn" style="color:#bae6fd">get_window(secs)</td><td style="font-size:10px">secs: int</td><td style="font-size:10px;color:var(--proto-lt)">DLPack capsule</td><td style="font-size:10px;color:var(--tx2)">shm_bridge.py → torch.from_dlpack()</td></tr>
+      <tr><td class="fn">ShmBridge</td><td class="fn" style="color:#bae6fd">get_raw_ptr(secs)</td><td style="font-size:10px">secs: int</td><td style="font-size:10px;color:var(--proto-lt)">(int, tuple)</td><td style="font-size:10px;color:var(--tx2)">shm_bridge.py → np.frombuffer()</td></tr>
+      <tr><td class="fn">FeatureEngine</td><td class="fn" style="color:#bae6fd">on_tick(bytes)</td><td style="font-size:10px">snapshot: bytes</td><td style="font-size:10px;color:var(--proto-lt)">None</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 每 tick 调用</td></tr>
+      <tr><td class="fn">FeatureEngine</td><td class="fn" style="color:#bae6fd">on_5m_close()</td><td style="font-size:10px">—</td><td style="font-size:10px;color:var(--proto-lt)">bytes (BarCloseEvent)</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 5m 闭合触发</td></tr>
+      <tr><td class="fn">OkxChannel</td><td class="fn" style="color:#bae6fd">place_order(bytes)</td><td style="font-size:10px">order: bytes (proto)</td><td style="font-size:10px;color:var(--proto-lt)">bytes (OrderReceipt)</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 执行层</td></tr>
+      <tr><td class="fn">OkxChannel</td><td class="fn" style="color:#bae6fd">cancel_order(str)</td><td style="font-size:10px">ord_id: str</td><td style="font-size:10px;color:var(--proto-lt)">bool</td><td style="font-size:10px;color:var(--tx2)">harness/pipeline_v1.py</td></tr>
+      <tr><td class="fn">MctsPool</td><td class="fn" style="color:#bae6fd">run_sync(bytes, fn)</td><td style="font-size:10px">state: bytes, rollout_fn: callable</td><td style="font-size:10px;color:var(--proto-lt)">bytes (MctsResult)</td><td style="font-size:10px;color:var(--tx2)">mcts_worker.py via run_in_executor</td></tr>
+    </table>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-h">Redis Key 命名规范（Rust 侧写入，Python 侧读取）</div>
+    <table class="ftable">
+      <tr><th>Key 模式</th><th>类型</th><th>Rust 写入</th><th>Qwen 读取</th><th>TTL</th></tr>
+      <tr><td class="fn fn-t">okx:snapshot:latest</td><td>String</td><td>okx_ws.rs 每 tick</td><td>shm_bridge.py fallback</td><td>5s</td></tr>
+      <tr><td class="fn fn-t">orders:{ordId}</td><td>Hash</td><td>order_state.rs</td><td>pnl_aggregator.py</td><td>24h</td></tr>
+      <tr><td class="fn fn-t">pnl:events</td><td>Stream</td><td>order_state.rs FILLED</td><td>pnl_tracker.py</td><td>永久</td></tr>
+      <tr><td class="fn fn-t">mcts:result:{trace_id}</td><td>String</td><td>mcts_core.rs</td><td>mcts_worker.py</td><td>30s</td></tr>
+      <tr><td class="fn fn-t">okx:rate:2s</td><td>String(INCR)</td><td>exec_channels.rs</td><td>—（只 Rust 用）</td><td>2s</td></tr>
+      <tr><td class="fn fn-t">system:time_offset</td><td>String</td><td>exec_channels.rs</td><td>—（只 Rust 用）</td><td>10min</td></tr>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ══ PAGE: 协作 ══ -->
+<div id="pg-collab" class="pg">
+<div class="sec">
+  <div class="sh">与 Qwen 的协作时序</div>
+  <div class="note n-g"><div class="nt2">并行执行策略</div>Phase 0 和 Phase 1 期间，你（DeepSeek）和 Qwen 可以完全并行开发，因为接口已由 Protobuf 完全约定。你的 .so 完成后，Qwen 的代码直接 import 测试，无需等待。</div>
+
+  <table class="ftable">
+    <tr><th>时间节点</th><th>你交付</th><th>Qwen 解锁</th><th>联调内容</th></tr>
+    <tr><td style="color:var(--proto-lt)">Week 1 Day 1</td><td style="font-size:10px">v8_core_engine.so（空壳），lib.rs 有类名注册</td><td style="font-size:10px;color:var(--tx2)">Qwen 可以开始写 shm_bridge.py 的类型存根和 import 验证</td><td style="font-size:10px;color:var(--tx2)">确认 import 不报错即可</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 2 Day 3</td><td style="font-size:10px">T1-1 buffer.rs 完成，ShmBridge 可用</td><td style="font-size:10px;color:var(--tx2)">shm_bridge.py 实际读取；resnet_encoder.py 输入验证</td><td style="font-size:10px;color:var(--tx2)">验证 torch.from_dlpack 返回 shape [T,50] float32</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 3 Day 1</td><td style="font-size:10px">T1-2 feature_engine.rs + T1-3 exec_channels.rs</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 可以接入特征流；Alpha 引擎可以读特征触发信号</td><td style="font-size:10px;color:var(--tx2)">5m 闭合事件是否正确触发；on_5m_close() 返回格式</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 3 末</td><td style="font-size:10px">T1-4 order_state.rs + T1-5 lib.rs 整合，Phase 1 完整 .so</td><td style="font-size:10px;color:var(--tx2)">pipeline_v1.py 完整闭环测试；OKX Demo 第一笔单</td><td style="font-size:10px;color:var(--tx2)">pnl:events Redis Stream 格式；trace_id 全链路追踪</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 4–6</td><td style="font-size:10px">无新 Rust 任务，配合调试</td><td style="font-size:10px;color:var(--tx2)">Qwen 独立推进 ResNet/AlphaCast/Triton</td><td style="font-size:10px;color:var(--tx2)">如有 SHM 接口 bug 随时修复</td></tr>
+    <tr><td style="color:var(--proto-lt)">Week 7</td><td style="font-size:10px">T4-1 mcts_core.rs + mock rollout_fn</td><td style="font-size:10px;color:var(--tx2)">mcts_worker.py 联调</td><td style="font-size:10px;color:var(--tx2)">run_in_executor 调用无死锁；结果 bytes 反序列化</td></tr>
+  </table>
+
+  <div class="note n-w"><div class="nt2">三个最容易出错的协作边界</div>
+    <strong style="color:var(--tx1)">1. PyO3 函数名大小写</strong>：Python 调用 <code>bridge.get_window()</code>，Rust PyO3 的方法名必须写 <code>"get_window"</code>（不是 getWindow 或 get_Window）。建议直接测试一遍。<br><br>
+    <strong style="color:var(--tx1)">2. bytes 传递的 Protobuf 版本</strong>：Qwen 的 Python 侧用 grpcio-tools 生成代码序列化 UnifiedOrder，你的 Rust 侧用 prost 反序列化，字段编号必须一致。如果有字段编号分歧，以 schemas/unified_order.proto 文件为准，双方都不得单方面改编号。<br><br>
+    <strong style="color:var(--tx1)">3. mcts_core.rs 的 rollout_fn 调用</strong>：你在 Rust Tokio 线程内回调 Python callable 时，必须先获取 GIL（<code>Python::with_gil()</code>），调用完成后立即释放。不要在循环内持有 GIL，否则 Qwen 的 asyncio 会被完全阻塞。
+  </div>
+</div>
+</div>
+
+<!-- ══ PAGE: 规则 ══ -->
+<div id="pg-rules" class="pg">
+<div class="sec">
+  <div class="sh">执行规则与约束</div>
+
+  <div class="note n-r"><div class="nt2">规则 1：每个 .rs 文件作为独立任务，不合并提交</div>每次只实现一个文件。不要试图在一次对话中完成所有 Rust 模块，每个文件完成后先验证编译通过，再开始下一个文件。合并 lib.rs 是最后一步。</div>
+
+  <div class="note n-r"><div class="nt2">规则 2：Protobuf 字段编号永不修改</div>schemas/*.proto 的字段编号（= 1, = 2...）一旦在 Phase 0 确定，任何情况下不得修改。字段名和注释可以改，编号不行。修改编号会导致 Rust 侧和 Python 侧序列化二进制不兼容，调试极难。</div>
+
+  <div class="note n-y"><div class="nt2">规则 3：所有 PyO3 方法必须 allow_threads</div>凡是有计算或 I/O 的 PyO3 方法，必须用 <code>py.allow_threads(|| {...})</code> 释放 GIL，否则 Qwen 的 Python 线程会被你的 Rust 计算阻塞。仅构造函数（#[new]）可以不 allow_threads。</div>
+
+  <div class="note n-y"><div class="nt2">规则 4：Redis Key 命名严格遵守约定</div>所有写入 Redis 的 Key 必须使用"接口契约"页中约定的名称，不得自创新 Key。如果需要新增 Key，先告知 Qwen，双方确认命名后再写入代码。</div>
+
+  <div class="note n-w"><div class="nt2">规则 5：SHM 文件路径固定</div>共享内存文件路径固定为 <code>/dev/shm/qts_eth5m</code>，不得改变。Qwen 的 shm_bridge.py 会 hardcode 这个路径。进程退出必须 unlink，启动时如果文件存在先 unlink 再重建。</div>
+
+  <div class="note n-g"><div class="nt2">规则 6：Demo 模式与实盘模式通过参数切换</div>OkxChannel 的构造函数接受 is_demo: bool 参数，Demo 时使用 wss://wspap.okx.com:8443/ws/v5/private（模拟盘），实盘时使用 wss://ws.okx.com:8443/ws/v5/private。切换只改参数，代码逻辑完全相同。</div>
+
+  <div class="ctx" style="margin-top:14px">
+    <div class="ctx-h">依赖版本锁定（不得变更）</div>
+    <pre style="margin:0"><span class="cc"># v8_core_engine/Cargo.toml [dependencies] 锁定版本</span>
+pyo3          = { version = <span class="cs">"0.21"</span>, features = [<span class="cs">"extension-module"</span>, <span class="cs">"abi3-py312"</span>] }
+tokio         = { version = <span class="cs">"1"</span>, features = [<span class="cs">"full"</span>] }
+prost         = <span class="cs">"0.12"</span>
+simd-json     = <span class="cs">"0.13"</span>
+memmap2       = <span class="cs">"0.9"</span>
+redis         = { version = <span class="cs">"0.25"</span>, features = [<span class="cs">"tokio-comp"</span>] }
+ring          = <span class="cs">"0.17"</span>
+reqwest       = { version = <span class="cs">"0.12"</span>, features = [<span class="cs">"json"</span>, <span class="cs">"rustls-tls"</span>] }
+tokio-tungstenite = { version = <span class="cs">"0.23"</span>, features = [<span class="cs">"rustls-tls-webpki-roots"</span>] }
+
+[build-dependencies]
+prost-build   = <span class="cs">"0.12"</span></pre>
+  </div>
+</div>
+</div>
+
+<script>
+function sw(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  const map={ctx:0,tasks:1,iface:2,collab:3,rules:4};
+  document.querySelectorAll('.nt')[map[id]].classList.add('on');
+  window.scrollTo(0,0);
+}
+function toggle(head){
+  const body=head.nextElementSibling;
+  const arrow=head.querySelector('.t-toggle');
+  const open=body.classList.toggle('open');
+  if(arrow)arrow.textContent=open?'▲':'▼';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+[package]
+name = "v8_core_engine"
+version = "0.1.0"
+edition = "2021"
+description = "QTS V8 Rust Core — SHM Bridge · Feature Engine · OKX Channel · MCTS Pool"
+
+[lib]
+name = "v8_core_engine"
+crate-type = ["cdylib"]
+path = "core/src/lib.rs"
+
+[features]
+default = ["protobuf"]
+protobuf = []
+
+[dependencies]
+pyo3 = { version = "0.21", features = ["abi3-py312", "extension-module"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+prost = "0.12"
+bytes = "1"
+memmap2 = "0.9"
+ring = "0.17"
+base64 = "0.22"
+rand = "0.8"
+rayon = "1.10"
+tracing = "0.1"
+thiserror = "2"
+
+# OKX WS + HTTP
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
+simd-json = "0.13"
+
+# Redis (Token Bucket + state handover)
+redis = { version = "0.25", features = ["tokio-comp"] }
+
+[build-dependencies]
+prost-build = "0.12"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

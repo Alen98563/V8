@@ -1,0 +1,61 @@
+name: "alphacast_resnet"
+platform: "pytorch_libtorch"
+max_batch_size: 64
+
+input [
+  {
+    name: "features"
+    data_type: TYPE_FP32
+    dims: [ 60, 178 ]
+  }
+]
+
+output [
+  {
+    name: "predicted_return"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "uncertainty"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "confidence"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "market_state"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [ 1, 4, 16 ]
+  max_queue_delay_microseconds: 1000
+}
+
+model_warmup [
+  {
+    name: "warmup"
+    batch_size: 1
+    inputs [
+      {
+        name: "features"
+        data_type: TYPE_FP32
+        dims: [ 60, 178 ]
+        input_data_type: TYPE_FP32
+      }
+    ]
+  }
+]

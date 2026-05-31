@@ -1,0 +1,32 @@
+# ─── New Market Template ───
+# Copy this directory, rename, and edit config.yaml
+#
+# cp -r markets/_template markets/xrp_5m
+# edit markets/xrp_5m/config.yaml
+#
+# Required fields:
+#   inst_id: XXX-USDT-SWAP (OKX standard)
+#   bar_seconds: 300
+#
+# SHM will be auto-created as /dev/shm/qts_{coin}5m
+
+inst_id: UNKNOWN-USDT-SWAP
+bar_seconds: 300
+dry_run: true
+okx_demo: true
+
+gating:
+  min_depth_10: 5.0
+  max_spread_bps: 10.0
+  max_realized_vol: 0.04
+  min_realized_vol: 0.00002
+  funding_blackout_min: 30
+  min_confidence: 0.55
+  max_uncertainty: 0.05
+
+risk:
+  max_position_pct: 0.5
+  max_daily_loss_pct: 0.03
+  kelly_fraction: 0.25
+
+log_level: INFO

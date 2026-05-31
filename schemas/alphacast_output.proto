@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package v8.alphacast;
+
+option java_multiple_files = true;
+
+// ============================================================
+// AlphaCast 多任务推断输出
+//
+// 对应 AlphaCast Transformer 模型 (6L8H) 的 4 头输出:
+//   - predicted_return: 预测收益
+//   - uncertainty: 不确定性
+//   - confidence: 置信度
+//   - market_state: 市场状态 (4 类: risk_on / risk_off / sideways / high_vol)
+//
+// Qwen 侧通过 Triton gRPC 获取推断结果，序列化为 bytes
+// Rust 侧 (mcts_core.rs) 接收此 bytes 后在 rollout 中使用
+// ============================================================
+
+/// AlphaCast 多任务推断结果 (recalibrated)
+message AlphaCastOutput {
+    /// 跟踪 ID
+    string trace_id = 1;
+
+    /// 预测收益 ŷ  (Temperature Scaling 校准后)
+    double predicted_return = 2;
+
+    /// 预测不确定性 σ  (已通过 Softplus 保证 > 0)
+    double uncertainty = 3;
+
+    /// 推断置信度  [0, 1]  (已过 Sigmoid)
+    double confidence = 4;
+
+    /// 市场状态: risk_on=0, risk_off=1, sideways=2, high_vol=3
+    int32 market_state = 5;
+
+    /// 市场状态各维度 logits (原始，未过 softmax)
+    repeated double market_state_logits = 6 [packed = true];
+
+    /// Temperature Scaling 参数  T ∈ [0.5, 3.0]
+    double temperature = 7;
+
+    // === V8 扩展字段 ===
+    /// 推断耗时 (ms)，Triton 客户端记录
+    double inference_latency_ms = 10;
+
+    /// Triton 模型版本
+    string model_version = 11;
+}
+
+/// 批量 AlphaCast 输出 (batch_size 查询)
+message AlphaCastOutputBatch {
+    repeated AlphaCastOutput outputs = 1;
+    string trace_id = 2;
+}

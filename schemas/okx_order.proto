@@ -1,0 +1,148 @@
+syntax = "proto3";
+
+package v8.okx;
+
+// ============================================================
+// OKX V5 API 订单合约 —— 严格按照 OKX V5 API 规范定义
+// 跨语言传输 (Rust ↔ Python)，字段与类型绝对安全
+// ============================================================
+
+// 产品类型
+enum InstType {
+  INST_TYPE_UNSPECIFIED = 0;
+  SPOT = 1;
+  SWAP = 2;       // 永续合约
+  FUTURES = 3;
+  OPTION = 4;
+  MARGIN = 5;
+}
+
+// 交易模式
+enum TdMode {
+  TD_MODE_UNSPECIFIED = 0;
+  CASH = 1;       // 现金
+  ISOLATED = 2;   // 逐仓
+  CROSS = 3;      // 全仓
+}
+
+// 持仓方向
+enum PosSide {
+  POS_SIDE_UNSPECIFIED = 0;
+  LONG = 1;
+  SHORT = 2;
+  NET = 3;        // 双向持仓净仓模式
+}
+
+// 订单方向
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+// 订单类型
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  MARKET = 1;
+  LIMIT = 2;
+  POST_ONLY = 3;
+  FOK = 4;        // Fill or Kill
+  IOC = 5;        // Immediate or Cancel
+}
+
+// 订单状态机 —— 严格枚举穷举所有状态
+enum OrderState {
+  ORDER_STATE_UNSPECIFIED = 0;
+
+  // L5: 订单创建 (new)
+  NEW = 1;
+
+  // L6: 提交到交易所
+  POSTED = 2;         // 已提交，等待交易所响应
+  PARTIAL_FILLED = 3; // 部分成交
+  FILLED = 4;         // 全部成交
+  PARTIAL_CANCELED = 5;
+  CANCELED = 6;       // 已撤销
+
+  // 异常状态
+  REJECTED = 7;       // 被交易所拒绝
+  EXPIRED = 8;        // 过期（GTC未成交，极少用）
+  UNKNOWN = 9;        // 订单ID无法在交易所查到
+
+  // 内部状态
+  PENDING_CANCEL = 10; // 撤单请求已发，等待确认
+}
+
+// 统一订单结构 —— 所有 Rust/Python 边界通信的唯一契约
+message UnifiedOrder {
+  // === 市场标识 ===
+  string inst_id = 1;       // 产品ID: "ETH-USDT-SWAP"
+  InstType inst_type = 2;   // 产品类型
+  TdMode td_mode = 3;       // 交易模式
+
+  // === 订单核心字段 ===
+  string cl_ord_id = 4;     // 客户端自定义订单ID（系统生成，用于幂等去重）
+  string ord_id = 5;        // 交易所返回的订单ID（下单后由OKX设置）
+  string algo_id = 6;       // 策略单ID（如止盈止损）
+
+  // === 交易参数 ===
+  OrderSide side = 7;       // 买卖方向
+  PosSide pos_side = 8;     // 持仓方向
+  OrderType order_type = 9; // 订单类型
+
+  // === 数量与价格 ===
+  string sz = 10;           // 数量（string避免浮点精度损失）
+  string px = 11;           // 价格（限价单必填，市价单可选，string格式）
+  string sz_ccy = 12;       // 数量单位: "ETH" / "USDT"
+
+  // === 状态追踪 ===
+  OrderState state = 13;    // 当前订单状态
+  string state_msg = 14;    // 状态变更原因说明
+  int64 created_at_ms = 15; // 创建时间戳 (毫秒 Unix)
+  int64 updated_at_ms = 16; // 最后更新时间戳
+
+  // === 成交信息 ===
+  string fill_sz = 17;      // 已成交数量
+  string fill_px = 18;      // 成交均价
+  string fee = 19;          // 手续费
+  string fee_ccy = 20;      // 手续费币种
+
+  // === 风控标签 ===
+  string tag = 21;          // 订单标签（OKX支持，用于风控追踪）
+
+  // === V8 扩展字段 ===
+  double alphacast_conf = 22;   // AlphaCast 置信度 [0, 1]
+  double mcts_path_value = 23;  // MCTS 最优路径期望收益
+  string trace_id = 24;         // Harness 全链路追踪 ID
+  int32 pulse_id = 25;          // 5m 脉冲编号（每个5m窗口递增）
+}
+
+// 订单确认回执（来自OKX REST响应或WS频道）
+message OrderReceipt {
+  string cl_ord_id = 1;
+  string ord_id = 2;
+  string inst_id = 3;
+  OrderState state = 4;
+  string fill_sz = 5;
+  string fill_px = 6;
+  string fee = 7;
+  string fee_ccy = 8;
+  int64 ts_ms = 9;           // OKX 服务器时间戳
+  int32 s_code = 10;         // OKX 返回码 (0 = 成功)
+  string s_msg = 11;         // OKX 返回消息
+}
+
+// 撤单请求
+message CancelOrderRequest {
+  string inst_id = 1;
+  string ord_id = 2;         // OKX 订单ID（优先）
+  string cl_ord_id = 3;      // 客户端订单ID（备选）
+  string trace_id = 4;
+}
+
+// 批量订单请求（用于 MCTS 多路径并行下单评估）
+message BatchOrderRequest {
+  repeated UnifiedOrder orders = 1;
+  int32 pulse_id = 2;
+  string trace_id = 3;
+}

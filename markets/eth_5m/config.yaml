@@ -1,0 +1,23 @@
+# ETH-USDT-SWAP 5m Market Config (future)
+# Copy from _template and adjust thresholds
+
+inst_id: ETH-USDT-SWAP
+bar_seconds: 300
+dry_run: true
+okx_demo: true
+
+gating:
+  min_depth_10: 5.0
+  max_spread_bps: 8.0
+  max_realized_vol: 0.04
+  min_realized_vol: 0.00002
+  funding_blackout_min: 30
+  min_confidence: 0.55
+  max_uncertainty: 0.05
+
+risk:
+  max_position_pct: 0.5
+  max_daily_loss_pct: 0.03
+  kelly_fraction: 0.25
+
+log_level: INFO

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package v8.signal;
+
+// ============================================================
+// Alpha 信号 / 交易决策契约
+// ============================================================
+
+// Alpha 信号
+message AlphaSignal {
+  string trace_id = 1;
+  string inst_id = 2;
+  int64 ts_ms = 3;
+  int32 pulse_id = 4;
+
+  string alpha_name = 5;           // alpha 引擎名称: "obi_v2", "funding_rate_arb" 等
+  double raw_signal = 6;           // 原始信号值 [-1, 1]
+  double confidence = 7;           // 经验置信度 [0, 1]
+
+  // 门控决策
+  bool g1_pass = 8;                // 流动性门
+  bool g2_pass = 9;                // Regime门
+  bool g3_pass = 10;               // 横截面门（Phase 2+）
+  bool g4_pass = 11;               // MetaLabeler门（Phase 3+）
+
+  // V8 AI 扩展
+  double alphacast_score = 12;     // AlphaCast 输出得分
+  double alphacast_conf = 13;      // AlphaCast 置信度
+  double alphacast_sigma = 14;     // AlphaCast 不确定性
+  double mcts_ev = 15;             // MCTS 期望收益
+
+  // 特征快照
+  repeated float feature_snapshot = 16;  // 178d 向量快照
+  bool passed = 17;                // 最终是否通过全部门控
+}
+
+// AlphaCast 推断输出
+message AlphaCastOutput {
+  string inst_id = 1;
+  int64 ts_ms = 2;
+  int32 pulse_id = 3;
+
+  double predicted_return = 4;     // 预测收益 ŷ
+  double uncertainty_sigma = 5;    // 不确定性 σ
+  double confidence = 6;           // 置信度 conf [0, 1]
+  string market_state_label = 7;   // 市场状态标签
+
+  // 校准后輸出
+  double calibrated_return = 8;
+  double temperature = 9;          // 温度缩放系数 T
+}

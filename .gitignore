@@ -1,0 +1,47 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+.Python
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/*.csv
+data/*.parquet
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Secrets
+.env
+*.pem
+*.key
+credentials.json
+
+# Compiled proto
+schemas/*_pb2.py
+schemas/*.pyi

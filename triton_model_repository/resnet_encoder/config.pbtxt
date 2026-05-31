@@ -1,0 +1,26 @@
+name: "resnet_encoder"
+platform: "pytorch_libtorch"
+max_batch_size: 64
+
+input [
+  {
+    name: "market_data"
+    data_type: TYPE_FP32
+    dims: [ 60, 50 ]
+  }
+]
+
+output [
+  {
+    name: "embedding"
+    data_type: TYPE_FP32
+    dims: [ 100 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]

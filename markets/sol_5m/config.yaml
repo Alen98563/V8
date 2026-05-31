@@ -1,0 +1,23 @@
+# SOL-USDT-SWAP 5m Market Config (future)
+# SOL has different volatility profile — wider thresholds
+
+inst_id: SOL-USDT-SWAP
+bar_seconds: 300
+dry_run: true
+okx_demo: true
+
+gating:
+  min_depth_10: 2.0           # SOL 深度较浅
+  max_spread_bps: 15.0        # SOL 点差更大
+  max_realized_vol: 0.06      # SOL 波动更大
+  min_realized_vol: 0.00005
+  funding_blackout_min: 30
+  min_confidence: 0.55
+  max_uncertainty: 0.05
+
+risk:
+  max_position_pct: 0.3       # SOL 更保守
+  max_daily_loss_pct: 0.03
+  kelly_fraction: 0.20
+
+log_level: INFO

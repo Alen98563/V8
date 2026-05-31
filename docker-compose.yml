@@ -1,0 +1,91 @@
+# docker-compose.yml — V8 基础设施编排
+# ========================================
+# 服务：Redis (状态持久化) + TimescaleDB (时序存储) + Triton (模型推理)
+#
+# 启动：docker-compose up -d
+# 日志：docker-compose logs -f
+# 停止：docker-compose down
+#
+# 端口映射：
+#   Redis:        6379
+#   TimescaleDB:  5432
+#   Triton HTTP:  8000
+#   Triton gRPC:  8001
+#   Triton Metrics: 8002
+
+version: "3.9"
+
+services:
+  # ── Redis — 状态持久化 + Token Bucket + 事件总线 ─────────
+  redis:
+    image: redis:7-alpine
+    container_name: v8-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── TimescaleDB — 时序数据存储 (K线/Tick/PnL) ───────────
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: v8-timescaledb
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: v8
+      POSTGRES_PASSWORD: ${V8_DB_PASSWORD:-v8_quant_2026}
+      POSTGRES_DB: v8_timeseries
+    volumes:
+      - ts_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U v8 -d v8_timeseries"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Triton Inference Server — 模型推理服务 ───────────────
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.04-py3
+    container_name: v8-triton
+    restart: unless-stopped
+    ports:
+      - "8000:8000"   # HTTP
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Metrics
+    volumes:
+      - ./triton_model_repository:/models
+    command: >
+      tritonserver
+      --model-repository=/models
+      --log-verbose=0
+      --exit-on-error=false
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  redis_data:
+  ts_data:

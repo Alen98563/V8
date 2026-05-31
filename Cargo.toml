@@ -1,0 +1,106 @@
+# ────────────────────────────────────────────────────────────────
+# QTS V8 Core Engine — Rust Crate Manifest
+# ────────────────────────────────────────────────────────────────
+#
+# 编译产物：v8_core_engine.pyd (Windows) / v8_core_engine.so (Linux/macOS)
+# 目标 Python：3.12 (abi3)
+# 构建工具：maturin develop / cargo build --release
+#
+# ── 依赖策略 ───────────────────────────────────────────────────
+# 1. 热路径依赖优先用 Rust 原生实现（ring > OpenSSL, simd-json > serde_json）
+# 2. 禁止引入完整框架（如 actix-web），仅用轻量协议库（tokio-tungstenite）
+# 3. 所有依赖锁定大版本（如 pyo3 0.21），小版本由 Cargo.lock 管理
+#
+# ── Feature Flags ──────────────────────────────────────────────
+#   default:         JSON 模式（无需 prost 编译）
+#   +protobuf:       启用 Protobuf 解析（FeatureEngine.on_tick 直接解码 bytes）
+# ────────────────────────────────────────────────────────────────
+
+[package]
+name = "v8_core_engine"
+version = "0.1.0"
+edition = "2021"
+description = "QTS V8 量化交易系统 Rust 热路径核心 — SHM Bridge · Feature Engine · OKX Channel · MCTS Pool"
+
+# ── Library Configuration ──────────────────────────────────────
+# crate-type = ["cdylib"] 生成 C ABI 兼容的动态库，PyO3 通过此入口暴露 Python 模块
+# path 指向 core/src/lib.rs（Monorepo 结构下 Cargo.toml 位于项目根目录）
+[lib]
+name = "v8_core_engine"
+crate-type = ["cdylib"]
+path = "core/src/lib.rs"
+
+# ── Runtime Dependencies ───────────────────────────────────────
+
+[dependencies]
+# PyO3 — Python C 扩展桥接
+# abi3-py312: 兼容 Python 3.12+；extension-module: 生成 .pyd 而非 .exe
+pyo3 = { version = "0.21", features = ["abi3-py312", "extension-module"] }
+
+# Tokio — 异步运行时 (MCTS 线程池 + OKX WS)
+tokio = { version = "1", features = ["full"] }
+
+# Serde — 序列化框架 (JSON ↔ Rust 结构体)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Prost — Protobuf 运行时 (可选, 需 feature = "protobuf")
+prost = { version = "0.12", optional = true }
+bytes = "1"
+
+# mmap2 — 共享内存映射 (Linux: /dev/shm, Windows: 命名共享内存)
+memmap2 = "0.9"
+
+# ring — 高性能加密 (HMAC-SHA256 签名，< 5µs)
+ring = "0.17"
+base64 = "0.22"
+
+# rand — 随机数 (MCTS UCB1 探索 + BehaviorHumanizer 微扰)
+rand = "0.8"
+
+# futures-util — OkxWsClient StreamExt / SinkExt (tokio-tungstenite companion)
+futures-util = "0.3"
+
+# rayon — 数据并行 (特征计算加速)
+rayon = "1.10"
+
+# tracing — 结构化日志
+tracing = "0.1"
+thiserror = "2"
+
+# OKX REST HTTP 客户端 (reqwest 0.12 + rustls-tls 避免 OpenSSL 依赖)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# OKX WebSocket 客户端 (Phase 2 集成至 .so)
+tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
+
+# simd-json — SIMD 加速 JSON 解析 (热路径特征提取)
+simd-json = "0.13"
+
+# Redis 客户端 (Token Bucket 持久化 + 跨进程状态交接)
+redis = { version = "0.25", features = ["tokio-comp"] }
+
+# ── Feature Flags ──────────────────────────────────────────────
+
+[features]
+default = []
+protobuf = ["prost", "prost-build"]
+
+# ── Build Dependencies ─────────────────────────────────────────
+
+[build-dependencies]
+# prost-build — 编译时 protoc 生成 Rust 代码 (可选, 需 feature = "protobuf")
+prost-build = { version = "0.12", optional = true }
+
+# ── Release Profile ───────────────────────────────────────────
+
+[profile.release]
+opt-level = 3        # 最高优化级别
+lto = true           # 链接时优化 (减小二进制体积，提升调用性能)
+codegen-units = 1    # 单个代码生成单元 (最大化内联)
+panic = "abort"      # panic 直接终止 (避免 unwind 开销，热路径关键优化)
+
+# ── Dev Profile ───────────────────────────────────────────────
+
+[profile.dev]
+opt-level = 1        # 编译速度与调试体验的平衡

@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package v8.market;
+
+// ============================================================
+// 行情数据契约 —— 双轨多源 Tick / Orderbook / Bar 数据
+// 严格定义所有字段，确保 Rust ↔ Python 零拷贝传输的类型安全
+// ============================================================
+
+// 市场状态枚举
+enum MarketState {
+  MARKET_STATE_UNSPECIFIED = 0;
+  PRE_OPEN = 1;
+  OPEN = 2;
+  CLOSED = 3;
+  HALTED = 4;
+  MAINTENANCE = 5;
+}
+
+// OKX 逐笔成交 (Trades Channel)
+message TradeTick {
+  string inst_id = 1;          // "ETH-USDT-SWAP"
+  string trade_id = 2;         // 成交ID
+  string px = 3;               // 成交价 (string 防精度损失)
+  string sz = 4;               // 成交数量
+  OrderSide side = 5;          // taker方向: buy/sell
+  int64 ts_ms = 6;             // OKX 服务器时间戳
+
+  // 扩展微观结构字段
+  double px_f64 = 7;           // 成交价 float64 (计算用)
+  double sz_f64 = 8;           // 成交数量 float64
+}
+
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+// OKX 订单簿快照 (Books5/Books50 Channel)
+message OrderBookSnapshot {
+  string inst_id = 1;
+  int64 ts_ms = 2;             // 交易所时间戳
+
+  // === 订单簿深度 ===
+  // bids[0] = 最佳买价, asks[0] = 最佳卖价
+  // 每个 Level 为一个 PriceLevel
+  repeated PriceLevel bids = 3;
+  repeated PriceLevel asks = 4;
+
+  // 聚合指标（Rust 预计算，零拷贝传给 Python）
+  double best_bid = 5;
+  double best_ask = 6;
+  double spread = 7;           // best_ask - best_bid
+  double spread_bps = 8;       // spread / mid * 10000
+  double mid_price = 9;        // (best_bid + best_ask) / 2
+  double bid_depth_10 = 10;    // 前10档买盘总深度
+  double ask_depth_10 = 11;    // 前10档卖盘总深度
+}
+
+// 单个价格档位
+message PriceLevel {
+  double px = 1;               // 价格
+  double sz = 2;               // 数量
+  int32 num_orders = 3;        // 订单数（OKX books5 不提供，books50提供）
+}
+
+// 5分钟 K线 (Candle5m Channel)
+message Bar5m {
+  string inst_id = 1;
+  int64 ts_ms = 2;             // 开盘时间戳
+  int64 close_ts_ms = 3;       // 收盘时间戳
+
+  double open = 4;
+  double high = 5;
+  double low = 6;
+  double close = 7;
+  double vol = 8;              // 成交量（计价货币）
+  double vol_base = 9;         // 成交量（基准货币: ETH）
+
+  int32 num_trades = 10;       // 5m内成交笔数
+  bool is_closed = 11;         // 是否已闭盘（true = 完整K线）
+}
+
+// 资金费率快照
+message FundingRateSnapshot {
+  string inst_id = 1;
+  int64 ts_ms = 2;
+  double funding_rate = 3;     // 当前资金费率
+  double next_funding_rate = 4;// 预测下一期资金费率
+  int64 funding_time_ms = 5;   // 下次结算时间戳
+  double interest_rate = 6;    // 利率
+  double premium = 7;          // 溢价
+}
+
+// 市场微结构快照 —— 聚合 Tick + Orderbook + Bar 的统一视图
+// 这是 5m 窗口的特征计算输入
+message MarketSnapshot {
+  string inst_id = 1;
+  int64 ts_ms = 2;              // 快照时间戳
+
+  OrderBookSnapshot orderbook = 3;
+  Bar5m current_bar = 4;        // 当前5m K线（可能未闭盘）
+
+  // 窗口内 Tick 聚合
+  repeated TradeTick recent_ticks = 5;     // 最近 N 笔成交
+  int32 tick_count_5m = 6;                 // 5m内总Tick数
+  double buy_vol_5m = 7;                   // 5m内主动买入量
+  double sell_vol_5m = 8;                  // 5m内主动卖出量
+
+  // 资金费率
+  FundingRateSnapshot funding = 9;
+
+  // 元数据
+  MarketState market_state = 10;
+  int32 pulse_id = 11;          // 5m 脉冲编号
+}
+
+// 特征向量 —— 由 Rust feature_engine 生产，DLPack 零拷贝传给 Python
+message FeatureVector {
+  string inst_id = 1;
+  int64 ts_ms = 2;
+  int32 pulse_id = 3;
+
+  // 50维经验特征 (float32 数组，DLPack 直接映射)
+  // 布局: [OHLCV(5), OBI(1), OFI(1), Spread_Z(1), Depth_Imb(1),
+  //        Mom_1m/5m/15m/1h(4), HV_5m/15m/1h(3), Hurst(1),
+  //        VWAP_dev(1), Realized_Skew(1), Realized_Kurt(1),
+  //        bid_ask_ratio(1), vol_profile(1),
+  //        velocity_6windows(6), trade_intensity(1),
+  //        ... 共 50 维]
+  // 注意: 此消息仅用于文档/日志，实际传输走 DLPack 零拷贝路径
+  repeated float features = 4;  // 50 维
+
+  int32 feature_dim = 5;        // 50 (MVP), 后续扩展到 178
+  bool is_precomputed = 6;      // 闭盘前预计算标记
+  bool is_final = 7;            // 闭盘瞬间修正后标记
+}
+
+// 融合特征 —— ResNet 128d ⊕ 经验 50d = 178d
+message FusedFeature {
+  string inst_id = 1;
+  int64 ts_ms = 2;
+  int32 pulse_id = 3;
+
+  repeated float empirical_features = 4;  // 50 维经验特征
+  repeated float resnet_embedding = 5;    // 128 维深度嵌入
+  repeated float fused_vector = 6;        // 178 维融合向量
+  double attention_alpha = 7;             // 注意力门控权重
+}

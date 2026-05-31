@@ -1,0 +1,58 @@
+# V8 量化交易系统 - API 密钥配置
+# 所有密钥从环境变量读取，此文件仅定义变量名映射
+
+# OKX 交易所配置
+okx:
+  # API 密钥环境变量名
+  api_key_env: "OKX_API_KEY"
+  # 密钥环境变量名
+  secret_key_env: "OKX_SECRET_KEY"
+  # 口令环境变量名
+  passphrase_env: "OKX_PASSPHRASE"
+  
+  # 模拟盘配置（用于测试）
+  demo:
+    api_key_env: "OKX_DEMO_API_KEY"
+    secret_key_env: "OKX_DEMO_SECRET_KEY"
+    passphrase_env: "OKX_DEMO_PASSPHRASE"
+  
+  # API 端点
+  endpoints:
+    # 主站 REST API
+    rest_base: "https://www.okx.com"
+    # WebSocket 公共端点
+    ws_public: "wss://ws.okx.com:8443/ws/v5/public"
+    # WebSocket 私有端点（需认证）
+    ws_private: "wss://ws.okx.com:8443/ws/v5/private"
+    # 模拟盘端点
+    demo_rest_base: "https://www.okx.com"
+    demo_ws_public: "wss://wspap.okx.com:8443/ws/v5/public"
+    demo_ws_private: "wss://wspap.okx.com:8443/ws/v5/private"
+
+# 告警通知配置
+alerts:
+  # Telegram Bot 配置
+  telegram:
+    # Bot Token 环境变量名
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+    # 聊天 ID 环境变量名
+    chat_id_env: "TELEGRAM_CHAT_ID"
+  
+  # 钉钉 Webhook 配置
+  dingtalk:
+    # Webhook URL 环境变量名
+    webhook_env: "DINGTALK_WEBHOOK"
+    # 签名密钥环境变量名（可选）
+    secret_env: "DINGTALK_SECRET"
+
+# Triton Inference Server 配置
+triton:
+  # 服务地址
+  host: "localhost"
+  # gRPC 端口
+  grpc_port: 8001
+  # HTTP 端口
+  http_port: 8000
+  # 模型名称
+  alphacast_model: "alphacast_resnet"
+  resnet_model: "resnet_encoder"

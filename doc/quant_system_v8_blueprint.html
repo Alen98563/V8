@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>量化交易系统融合蓝图 V8 · ResNet + AlphaCast + MCTS + Empirical Alpha + Harness</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#06080f;--bg1:#0b0e1a;--bg2:#0f1420;--bg3:#141b2d;--bg4:#1a2235;
+  --bdr:#1e2a3d;--bdr2:#2a3650;
+  --tx1:#f1f5f9;--tx2:#94a3b8;--tx3:#4b5563;
+  --poly:#0d9488;--poly-bg:#021b18;--poly-lt:#5eead4;
+  --cryp:#6366f1;--cryp-bg:#13103a;--cryp-lt:#c7d2fe;
+  --equi:#3b82f6;--equi-bg:#0c1e3a;--equi-lt:#bfdbfe;
+  --fore:#f59e0b;--fore-bg:#1c1204;--fore-lt:#fde68a;
+  --alph:#8b5cf6;--alph-bg:#130c28;--alph-lt:#ddd6fe;
+  --gate:#22c55e;--gate-bg:#071a0e;--gate-lt:#bbf7d0;
+  --risk:#ef4444;--risk-bg:#180505;--risk-lt:#fecaca;
+  --warn:#f97316;--warn-bg:#1a0b00;--warn-lt:#fed7aa;
+  /* NEW modules */
+  --resnet:#e879f9;--resnet-bg:#1a0520;--resnet-lt:#f5d0fe;
+  --acast:#fbbf24;--acast-bg:#1c1100;--acast-lt:#fef3c7;
+  --mcts:#38bdf8;--mcts-bg:#031728;--mcts-lt:#bae6fd;
+  --harn:#10b981;--harn-bg:#021a0e;--harn-lt:#a7f3d0;
+}
+body{background:var(--bg0);color:var(--tx1);font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;line-height:1.5}
+
+/* ── Nav ── */
+.nav{position:sticky;top:0;z-index:200;background:rgba(6,8,15,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 14px;gap:0;min-height:42px}
+.nav-brand{font-size:11px;font-weight:800;letter-spacing:.08em;padding-right:14px;border-right:1px solid var(--bdr);margin-right:8px;white-space:nowrap;background:linear-gradient(90deg,var(--alph),var(--mcts));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-ver{font-size:10px;color:var(--tx3);margin-right:14px}
+.tab{padding:11px 12px;font-size:11px;font-weight:500;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.tab:hover{color:var(--tx2)}.tab.on{color:var(--tx1);border-color:var(--alph)}
+
+/* ── Pages ── */
+.pg{display:none;padding:14px;max-width:1400px;margin:0 auto}.pg.on{display:block}
+
+/* ── Badges ── */
+.bdg{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:.03em;vertical-align:middle;margin-left:3px}
+.b-new{background:#064e3b;color:#6ee7b7}.b-upd{background:#1e3a5f;color:#93c5fd}
+.b-v8{background:#2d0a3e;color:#e879f9}.b-orig{background:#1a2235;color:#94a3b8}
+.b-ai{background:#1c1100;color:#fbbf24}.b-mcts{background:#031728;color:#7dd3fc}
+
+/* ── Layout ── */
+.main-layout{display:grid;grid-template-columns:1fr 272px;gap:10px;align-items:start}
+.infra-col{position:sticky;top:50px}
+.darr{text-align:center;color:#2a3a5c;font-size:18px;padding:2px 0;letter-spacing:4px;user-select:none}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row+.row{margin-top:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+
+/* ── Layer containers ── */
+.lyr{border-radius:10px;padding:10px 12px;margin-bottom:5px;border:1px solid}
+.lhd{font-size:10px;font-weight:700;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+
+/* Layer themes */
+.lyr-src{background:#09081a;border-color:var(--bdr2)}.lyr-src .lhd{color:var(--tx2)}
+.lyr-adapt{background:#100d24;border-color:var(--alph)}.lyr-adapt .lhd{color:var(--alph-lt)}
+.lyr-p1{background:#0a0c1e;border-color:#3b5bdb}.lyr-p1 .lhd{color:#74a0ff}
+.lyr-data{background:#090d18;border-color:#1d4ed8}.lyr-data .lhd{color:#60a5fa}
+.lyr-alpha{background:#0d0b22;border-color:var(--alph)}.lyr-alpha .lhd{color:var(--alph-lt)}
+.lyr-p2{background:#070f08;border-color:var(--gate)}.lyr-p2 .lhd{color:var(--gate-lt)}
+.lyr-decide{background:#0a1208;border-color:#16a34a}.lyr-decide .lhd{color:#4ade80}
+.lyr-p3{background:#0d0720;border-color:var(--alph)}.lyr-p3 .lhd{color:var(--alph-lt)}
+.lyr-route{background:#130800;border-color:#b45309}.lyr-route .lhd{color:#fbbf24}
+.lyr-exec{background:#110800;border-color:#c2410c}.lyr-exec .lhd{color:#fb923c}
+.lyr-settle{background:#0d0b22;border-color:var(--alph)}.lyr-settle .lhd{color:var(--alph-lt)}
+/* NEW layer themes */
+.lyr-resnet{background:var(--resnet-bg);border-color:var(--resnet)}.lyr-resnet .lhd{color:var(--resnet-lt)}
+.lyr-acast{background:var(--acast-bg);border-color:var(--acast)}.lyr-acast .lhd{color:var(--acast-lt)}
+.lyr-mcts{background:var(--mcts-bg);border-color:var(--mcts)}.lyr-mcts .lhd{color:var(--mcts-lt)}
+.lyr-harn{background:var(--harn-bg);border-color:var(--harn)}.lyr-harn .lhd{color:var(--harn-lt)}
+.lyr-fusion{background:#120820;border-color:#7c3aed}.lyr-fusion .lhd{color:#d8b4fe}
+
+/* ── Boxes ── */
+.box{flex:1;min-width:110px;border-radius:7px;padding:8px 10px;border:1px solid transparent}
+.bname{font-size:11px;font-weight:600;line-height:1.4;margin-bottom:2px}
+.bsub{font-size:9px;line-height:1.55;color:inherit;opacity:.82}
+.bx-p{background:var(--poly-bg);border-color:var(--poly)!important}.bx-p .bname{color:var(--poly-lt)}.bx-p .bsub{color:#2dd4bf}
+.bx-c{background:var(--cryp-bg);border-color:var(--cryp)!important}.bx-c .bname{color:var(--cryp-lt)}.bx-c .bsub{color:#a5b4fc}
+.bx-e{background:var(--equi-bg);border-color:var(--equi)!important}.bx-e .bname{color:var(--equi-lt)}.bx-e .bsub{color:#93c5fd}
+.bx-f{background:var(--fore-bg);border-color:var(--fore)!important}.bx-f .bname{color:var(--fore-lt)}.bx-f .bsub{color:#fcd34d}
+.bx-a{background:var(--alph-bg);border-color:var(--alph)!important}.bx-a .bname{color:var(--alph-lt)}.bx-a .bsub{color:#c4b5fd}
+.bx-g{background:var(--gate-bg);border-color:var(--gate)!important}.bx-g .bname{color:var(--gate-lt)}.bx-g .bsub{color:#86efac}
+.bx-o{background:var(--warn-bg);border-color:var(--warn)!important}.bx-o .bname{color:var(--warn-lt)}.bx-o .bsub{color:#fdba74}
+.bx-r{background:var(--risk-bg);border-color:var(--risk)!important}.bx-r .bname{color:var(--risk-lt)}.bx-r .bsub{color:#fca5a5}
+.bx-n{background:var(--bg3);border-color:var(--bdr2)!important}.bx-n .bname{color:var(--tx1)}.bx-n .bsub{color:var(--tx2)}
+/* NEW box fills */
+.bx-res{background:var(--resnet-bg);border-color:var(--resnet)!important}.bx-res .bname{color:var(--resnet-lt)}.bx-res .bsub{color:#f0abfc}
+.bx-ac{background:var(--acast-bg);border-color:var(--acast)!important}.bx-ac .bname{color:var(--acast-lt)}.bx-ac .bsub{color:#fde68a}
+.bx-mc{background:var(--mcts-bg);border-color:var(--mcts)!important}.bx-mc .bname{color:var(--mcts-lt)}.bx-mc .bsub{color:#7dd3fc}
+.bx-h{background:var(--harn-bg);border-color:var(--harn)!important}.bx-h .bname{color:var(--harn-lt)}.bx-h .bsub{color:#6ee7b7}
+.bx-pk{background:#200730;border-color:#a855f7!important}.bx-pk .bname{color:#f0abfc}.bx-pk .bsub{color:#e879f9}
+
+/* ── Special components ── */
+.redis{background:#130303;border:1.5px solid var(--risk);border-radius:8px;padding:8px 14px;text-align:center;margin:5px 0}
+.redis .bname{color:#fca5a5;font-size:12px}.redis .bsub{color:#f87171;font-size:10px;margin-top:2px}
+
+.alpha-zone{border:1px dashed var(--alph);border-radius:12px;padding:10px;margin:5px 0;background:#070414}
+.alpha-zone-title{font-size:10px;font-weight:700;color:var(--alph);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.alpha-zone-title::before,.alpha-zone-title::after{content:'';flex:1;height:1px;background:var(--alph);opacity:.3}
+
+/* AI Module zones */
+.ai-zone{border-radius:12px;padding:10px;margin:5px 0}
+.ai-zone-resnet{background:#0d021a;border:1.5px solid var(--resnet)}
+.ai-zone-acast{background:#0f0800;border:1.5px solid var(--acast)}
+.ai-zone-mcts{background:#010d1a;border:1.5px solid var(--mcts)}
+.ai-zone-title{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ai-zone-resnet .ai-zone-title{color:var(--resnet)}
+.ai-zone-acast .ai-zone-title{color:var(--acast)}
+.ai-zone-mcts .ai-zone-title{color:var(--mcts)}
+.ai-zone-title::before,.ai-zone-title::after{content:'';flex:1;height:1px;opacity:.3}
+.ai-zone-resnet .ai-zone-title::before,.ai-zone-resnet .ai-zone-title::after{background:var(--resnet)}
+.ai-zone-acast .ai-zone-title::before,.ai-zone-acast .ai-zone-title::after{background:var(--acast)}
+.ai-zone-mcts .ai-zone-title::before,.ai-zone-mcts .ai-zone-title::after{background:var(--mcts)}
+
+/* Harness zone */
+.harn-zone{background:#010f07;border:1.5px solid var(--harn);border-radius:14px;padding:12px;margin:5px 0}
+.harn-zone-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;color:var(--harn)}
+.harn-zone-title::before,.harn-zone-title::after{content:'';flex:1;height:1px;background:var(--harn);opacity:.3}
+
+/* Fusion bar */
+.fusion-bar{background:linear-gradient(135deg,#0d0b22,#120820,#0d0b22);border:1.5px solid #7c3aed;border-radius:10px;padding:10px 14px;margin:5px 0;text-align:center}
+.fusion-bar-title{font-size:11px;font-weight:700;color:#d8b4fe;margin-bottom:4px}
+.fusion-bar-sub{font-size:9px;color:#9f7aea;letter-spacing:.02em}
+.fusion-chips{display:flex;justify-content:center;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap}
+.fchip{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600}
+.fchip-a{background:#2d1b69;color:#d8b4fe;border:1px solid var(--alph)}
+.fchip-r{background:#2d0a3e;color:#f5d0fe;border:1px solid var(--resnet)}
+.fchip-arr{color:#4b5563;font-size:14px}
+.fchip-out{background:#1a0a30;color:#e879f9;border:1px solid #a855f7}
+
+/* Phase band */
+.phase-band{border-radius:6px;padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:.06em;display:inline-flex;align-items:center;gap:5px;margin-bottom:7px}
+.pb-p1{background:#0e1f4e;color:#74a0ff;border:1px solid #3b5bdb}
+.pb-p2{background:#0a2218;color:#86efac;border:1px solid var(--gate)}
+.pb-p3{background:#1a0835;color:#c4b5fd;border:1px solid var(--alph)}
+
+/* Interface bar */
+.iface{background:#100d24;border:1px solid var(--alph);border-radius:7px;padding:7px 12px;text-align:center;margin:5px 0}
+.iface-name{font-size:11px;font-weight:700;color:var(--alph-lt);margin-bottom:2px}
+.iface-methods{font-size:9px;color:#7c3aed;font-family:monospace;opacity:.9}
+
+/* Split lanes */
+.split{display:flex;gap:6px;margin:5px 0}
+.lane{flex:1;border-radius:8px;padding:8px;border:1px dashed}
+.lane-ws{border-color:var(--poly);background:#030f0d}
+.lane-ord{border-color:var(--fore);background:#0f0800}
+.lane-ttl{font-size:9px;font-weight:700;letter-spacing:.05em;margin-bottom:5px}
+.lane-ws .lane-ttl{color:var(--poly-lt)}.lane-ord .lane-ttl{color:var(--fore-lt)}
+
+/* Exec 4-path grid */
+.exec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:5px}
+.exec-lane{border-radius:8px;padding:8px;border:1px dashed}
+.el-p{border-color:var(--poly);background:#030f0d}.el-c{border-color:var(--cryp);background:#0b0e2a}
+.el-e{border-color:var(--equi);background:#071022}.el-f{border-color:var(--fore);background:#0f0800}
+.el-ttl{font-size:9px;font-weight:700;letter-spacing:.04em;margin-bottom:4px}
+.el-p .el-ttl{color:var(--poly-lt)}.el-c .el-ttl{color:var(--cryp-lt)}
+.el-e .el-ttl{color:var(--equi-lt)}.el-f .el-ttl{color:var(--fore-lt)}
+
+/* Feedback loop */
+.fb{border:1px dashed var(--alph);border-radius:6px;padding:7px 10px;margin-top:5px;background:#070414;font-size:9px;color:#a78bfa}
+.fb-ttl{font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--alph-lt);margin-bottom:3px;text-transform:uppercase}
+
+/* Infra sidebar */
+.infra-block{background:var(--bg1);border:1px solid var(--bdr2);border-radius:9px;padding:10px;margin-bottom:7px}
+.infra-ttl{font-size:9px;font-weight:700;letter-spacing:.05em;color:var(--tx2);text-transform:uppercase;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--bdr)}
+.infra-row{display:flex;align-items:flex-start;gap:7px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:10px}
+.infra-row:last-child{border-bottom:none}
+.infra-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.infra-label{font-weight:500;color:var(--tx1)}.infra-sub{color:var(--tx3);font-size:9px;margin-top:1px}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--bg1);border-radius:8px;border:1px solid var(--bdr)}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--tx2)}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Stats bar */
+.stats-bar{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.stat{flex:1;min-width:88px;padding:8px;border-radius:7px;border:1px solid;text-align:center}
+.stat-val{font-size:16px;font-weight:700;font-family:monospace;margin-bottom:1px}
+.stat-lbl{font-size:9px;opacity:.7}
+.sv-b{background:#071022;border-color:#3b82f6}.sv-b .stat-val{color:#60a5fa}
+.sv-p{background:var(--alph-bg);border-color:var(--alph)}.sv-p .stat-val{color:var(--alph-lt)}
+.sv-g{background:var(--gate-bg);border-color:var(--gate)}.sv-g .stat-val{color:var(--gate-lt)}
+.sv-o{background:var(--warn-bg);border-color:#d97706}.sv-o .stat-val{color:var(--fore-lt)}
+.sv-r{background:var(--risk-bg);border-color:var(--risk)}.sv-r .stat-val{color:var(--risk-lt)}
+.sv-res{background:var(--resnet-bg);border-color:var(--resnet)}.sv-res .stat-val{color:var(--resnet-lt)}
+.sv-ac{background:var(--acast-bg);border-color:var(--acast)}.sv-ac .stat-val{color:var(--acast-lt)}
+.sv-mc{background:var(--mcts-bg);border-color:var(--mcts)}.sv-mc .stat-val{color:var(--mcts-lt)}
+
+/* Code block */
+.code{background:#040608;border:1px solid var(--bdr);border-radius:7px;padding:9px 11px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:9.5px;line-height:1.75;overflow-x:auto;margin-top:6px}
+.ck{color:#818cf8}.cv{color:#f472b6}.cs{color:#34d399}.cc{color:#4b5563;font-style:italic}.co{color:#fb923c}
+
+/* Flow signal bar */
+.flow-sig{background:var(--bg1);border:1px solid var(--bdr2);border-radius:9px;padding:10px 12px;margin-bottom:8px}
+.flow-sig-ttl{font-size:10px;font-weight:600;color:var(--tx2);margin-bottom:8px}
+.flow-nodes{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:2px}
+.fn{padding:6px 10px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;text-align:center;min-width:80px}
+.fn-arr{color:var(--bdr2);font-size:14px;padding:0 3px;flex-shrink:0}
+.fn-h{background:#1a2235;color:#94a3b8;border:1px solid #2a3650}
+.fn-p1{background:#071022;color:#74a0ff;border:1px solid #3b5bdb}
+.fn-p2{background:var(--gate-bg);color:#86efac;border:1px solid var(--gate)}
+.fn-p3{background:var(--alph-bg);color:#c4b5fd;border:1px solid var(--alph)}
+.fn-ex{background:var(--warn-bg);color:#fdba74;border:1px solid #c2410c}
+.fn-lb{background:#031409;color:#6ee7b7;border:1px solid #065f46}
+.fn-res{background:var(--resnet-bg);color:var(--resnet-lt);border:1px solid var(--resnet)}
+.fn-ac{background:var(--acast-bg);color:var(--acast-lt);border:1px solid var(--acast)}
+.fn-mc{background:var(--mcts-bg);color:var(--mcts-lt);border:1px solid var(--mcts)}
+.fn-harn{background:var(--harn-bg);color:var(--harn-lt);border:1px solid var(--harn)}
+
+/* Comparison table */
+.cmp{width:100%;border-collapse:collapse;font-size:9.5px;margin-top:6px}
+.cmp th{padding:5px 8px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600;color:var(--tx2)}
+.cmp td{padding:5px 8px;border-bottom:1px solid #0e1525;color:#cbd5e1}
+.cmp tr:last-child td{border-bottom:none}
+.tc-g{color:#4ade80;font-weight:600}.tc-b{color:#60a5fa}.tc-p{color:#a78bfa}
+.tc-o{color:#fb923c}.tc-r{color:#f87171}.tc-y{color:#fde68a}
+.tc-res{color:var(--resnet-lt)}.tc-ac{color:var(--acast-lt)}.tc-mc{color:var(--mcts-lt)}.tc-harn{color:var(--harn-lt)}
+
+/* MCTS path visualization */
+.mcts-tree{display:flex;gap:6px;margin-top:8px}
+.mcts-col{flex:1;display:flex;flex-direction:column;gap:4px;align-items:center}
+.mcts-node{border-radius:6px;padding:5px 8px;font-size:9px;font-weight:600;text-align:center;border:1px solid}
+.mn-root{background:#031a2a;border-color:var(--mcts);color:var(--mcts-lt);min-width:100px}
+.mn-a{background:#0d1a1a;border-color:#0d9488;color:#5eead4}
+.mn-b{background:#031728;border-color:var(--mcts);color:#7dd3fc;border-style:dashed}
+.mn-c{background:#180505;border-color:#ef4444;color:#fca5a5}
+.mn-best{background:#0a1a0a;border-color:#22c55e;color:#86efac}
+.mcts-line{font-size:10px;color:#2a3650;text-align:center}
+
+/* AlphaCast output display */
+.ac-output{display:flex;gap:6px;margin-top:8px}
+.ac-out-card{flex:1;border-radius:7px;padding:8px;border:1px solid var(--acast);background:var(--acast-bg);text-align:center}
+.ac-out-val{font-size:20px;font-weight:700;font-family:monospace;color:var(--acast-lt)}
+.ac-out-lbl{font-size:9px;color:#92400e;margin-top:2px}
+
+/* ResNet architecture viz */
+.resnet-layers{display:flex;gap:4px;align-items:center;margin-top:8px;overflow-x:auto;padding-bottom:4px}
+.rl{border-radius:6px;padding:5px 8px;font-size:9px;font-weight:600;text-align:center;border:1px solid var(--resnet);flex-shrink:0}
+.rl-a{background:#100215;color:var(--resnet-lt)}
+.rl-b{background:#1a0325;color:var(--resnet-lt);opacity:.85}
+.rl-skip{font-size:8px;color:var(--resnet);background:transparent;border-style:dashed}
+.rl-arr{color:#4b5563;font-size:12px;padding:0 2px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-brand">QTS · V8 FUSION</div>
+  <div class="nav-ver">ResNet · AlphaCast · MCTS · Empirical Alpha · Harness</div>
+  <div class="tab on" onclick="sw('full')">🗺 全系统总览</div>
+  <div class="tab" onclick="sw('ai')">🤖 AI推演引擎</div>
+  <div class="tab" onclick="sw('alpha')">🧠 Empirical Alpha</div>
+  <div class="tab" onclick="sw('pipeline')">⚡ 主交易流程</div>
+  <div class="tab" onclick="sw('network')">🌐 网络架构</div>
+  <div class="tab" onclick="sw('ref')">📐 组件参考</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 1 · FULL SYSTEM OVERVIEW
+════════════════════════════════════ -->
+<div id="pg-full" class="pg on">
+
+<div class="stats-bar">
+  <div class="stat sv-b"><div class="stat-val">8+</div><div class="stat-lbl">架构层数</div></div>
+  <div class="stat sv-p"><div class="stat-val">4</div><div class="stat-lbl">接入市场</div></div>
+  <div class="stat sv-p"><div class="stat-val">12</div><div class="stat-lbl">Alpha 引擎</div></div>
+  <div class="stat sv-g"><div class="stat-val">50+</div><div class="stat-lbl">结构化特征</div></div>
+  <div class="stat sv-res"><div class="stat-val">ResNet</div><div class="stat-lbl">深度特征提取</div></div>
+  <div class="stat sv-ac"><div class="stat-val">AlphaCast</div><div class="stat-lbl">时序预测×2</div></div>
+  <div class="stat sv-mc"><div class="stat-val">MCTS</div><div class="stat-lbl">N步路径推演</div></div>
+  <div class="stat sv-o"><div class="stat-val">G1-G4</div><div class="stat-lbl">分层门控</div></div>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:var(--poly)"></div>Polymarket</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--cryp)"></div>加密永续</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--equi)"></div>美股/期权</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--fore)"></div>外汇 MT4/5</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--alph)"></div>Empirical Alpha</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--resnet)"></div>ResNet <span class="bdg b-v8">V8</span></div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--acast)"></div>AlphaCast <span class="bdg b-v8">V8</span></div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--mcts)"></div>MCTS <span class="bdg b-v8">V8</span></div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--harn)"></div>Harness <span class="bdg b-v8">V8</span></div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--risk)"></div>Redis 总线</div>
+</div>
+
+<div class="main-layout">
+<!-- ── Left: main pipeline ── -->
+<div>
+
+<!-- L0 Sources -->
+<div class="lyr lyr-src">
+  <div class="lhd">🌐 L0 · 多市场外部数据源</div>
+  <div class="row">
+    <div class="box bx-p"><div class="bname">Polymarket WS/REST</div><div class="bsub">实时订单簿 · 500+ 预测市场 · CLOB 链上</div></div>
+    <div class="box bx-c"><div class="bname">Binance / OKX / Bybit</div><div class="bsub">永续合约 · 资金费率 · OI · 多所 WS</div></div>
+    <div class="box bx-e"><div class="bname">Alpaca REST / IB TWS</div><div class="bsub">美股 · 期权链 · Greeks · 9:30–16:00 ET</div></div>
+    <div class="box bx-f"><div class="bname">MT4/5 ZMQ Bridge</div><div class="bsub">经纪商报价 · Tick 流 · DWX EA</div></div>
+    <div class="box bx-n"><div class="bname">News / RSS</div><div class="bsub">Twitter · NewsAPI · NLP 事件冲击</div></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- L1 Adapters -->
+<div class="lyr lyr-adapt">
+  <div class="lhd">🔌 L1 · 市场适配器层</div>
+  <div class="iface">
+    <div class="iface-name">IMarketAdapter — 统一接口，上层永远只与此通信</div>
+    <div class="iface-methods">connect() · place_order(UnifiedOrder) · cancel_order() · get_position() · get_balance() · subscribe_data() · is_session_open()</div>
+  </div>
+  <div class="row">
+    <div class="box bx-p"><div class="bname">PolyAdapter</div><div class="bsub">CLOB签名 · 链上Gas · Polygon RPC · 代理出口</div></div>
+    <div class="box bx-c"><div class="bname">CryptoAdapter</div><div class="bsub">资金费率监控 · 标记价格 · 强平预警 · qty→contracts</div></div>
+    <div class="box bx-e"><div class="bname">EquityAdapter</div><div class="bsub">PDT计数器 · T+2追踪 · 期权链 · Alpaca/IB双模式</div></div>
+    <div class="box bx-f"><div class="bname">ForexAdapter</div><div class="bsub">手数换算 · pip值 · 过夜利息 · ZMQ→MT4</div></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- EMPIRICAL ALPHA PHASE 1 -->
+<div class="alpha-zone">
+  <div class="alpha-zone-title">🧠 EMPIRICAL ALPHA · Phase 1 · 特征基础设施</div>
+  <div class="phase-band pb-p1">PHASE 1 · market_state_buffer · feature_engine · cross_section</div>
+  <div class="lyr lyr-p1" style="margin-bottom:0">
+    <div class="lhd" style="margin-bottom:6px">特征工程层</div>
+    <div class="row">
+      <div class="box bx-a"><div class="bname">BufferRegistry</div><div class="bsub">每市场独立 deque(3600) · MarketSnapshot · O(1) push · get_window(seconds)</div></div>
+      <div class="box bx-a"><div class="bname">FeatureEngine</div><div class="bsub">velocity(6窗口) · regime(Hurst/vol) · microstructure · order-flow · 50+ features</div></div>
+      <div class="box bx-a"><div class="bname">CrossSectionEngine</div><div class="bsub">全市场百分位排名 · cs_composite [0,1] · cs_tier 0–3 · 每5s刷新</div></div>
+    </div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- L2 Data -->
+<div class="lyr lyr-data">
+  <div class="lhd">📊 L2 · 数据接入与标准化层</div>
+  <div class="row">
+    <div class="box bx-p"><div class="bname">Poly 市场扫描器</div><div class="bsub">REST 500+ 市场 · Hot/Active/Warm 三级池</div></div>
+    <div class="box bx-c"><div class="bname">Crypto 扫描器</div><div class="bsub">资金费率排行 · OI变化 · 多所对比</div></div>
+    <div class="box bx-e"><div class="bname">Equity 扫描器</div><div class="bsub">IV rank · 期权流 · 异常成交量</div></div>
+    <div class="box bx-f"><div class="bname">Forex 扫描器</div><div class="bsub">主要货币对价差 · 新闻事件 · COT</div></div>
+    <div class="box bx-n"><div class="bname">Data Normalizer</div><div class="bsub">统一 Tick/OHLCV · 全P&L换算USD</div></div>
+  </div>
+  <div class="redis">
+    <div class="bname">🔴 Redis 统一数据总线 — 多市场命名空间</div>
+    <div class="bsub">poly:* · crypto:* · equity:* · forex:* — Orderbook · Trades · Price · Signals · Positions · FundingRates · Features(P1) · Labels(P2)</div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- ════ NEW: RESNET + FUSION ════ -->
+<div class="ai-zone ai-zone-resnet">
+  <div class="ai-zone-title">🧬 ResNet · 深度特征提取 <span class="bdg b-v8">V8 NEW</span></div>
+  <div class="row">
+    <div class="box bx-res" style="flex:2"><div class="bname">ResidualConvNet</div><div class="bsub">输入: 50+ Empirical Alpha 特征向量 + 原始 OHLCV 序列<br>残差块 × 6 · 跨层恒等映射防梯度消失 · BatchNorm · LeakyReLU</div></div>
+    <div class="box bx-res"><div class="bname">时序编码器</div><div class="bsub">1D-Conv 滑窗 [30,60,120,240s]<br>多尺度感受野 · 捕获短中期模式</div></div>
+    <div class="box bx-res"><div class="bname">特征投影头</div><div class="bsub">GlobalAvgPool → FC(256→128)<br>输出: 128维深度嵌入向量</div></div>
+  </div>
+</div>
+
+<div class="fusion-bar">
+  <div class="fusion-bar-title">⚡ 特征融合层 Feature Fusion</div>
+  <div class="fusion-chips">
+    <span class="fchip fchip-a">Empirical Alpha 50维</span>
+    <span class="fchip-arr">⊕</span>
+    <span class="fchip fchip-r">ResNet 深度嵌入 128维</span>
+    <span class="fchip-arr">→</span>
+    <span class="fchip fchip-out">融合特征向量 178维</span>
+  </div>
+  <div class="fusion-bar-sub">注意力门控加权融合 · 自动调节经验特征 vs 深度特征的贡献比</div>
+</div>
+<div class="darr">↓</div>
+
+<!-- L3 Alpha Engines -->
+<div class="lyr lyr-alpha">
+  <div class="lhd">🔬 L3 · Alpha 引擎层（12 引擎并行）</div>
+  <div class="row">
+    <div class="box bx-p"><div class="bname">Spread Capture</div><div class="bsub">点差套利 · 40–80笔/天</div></div>
+    <div class="box bx-p"><div class="bname">OBI v2</div><div class="bsub">订单簿不平衡 · 20–40笔/天</div></div>
+    <div class="box bx-p"><div class="bname">OFI Engine</div><div class="bsub">订单流不平衡 · 10–30笔/天</div></div>
+    <div class="box bx-p"><div class="bname">Prob. Surface</div><div class="bsub">概率曲面套利 · 10–30笔/天</div></div>
+  </div>
+  <div class="row">
+    <div class="box bx-p"><div class="bname">Temporal Arb</div><div class="bsub">时间滞后 · 10–40笔/天</div></div>
+    <div class="box bx-p"><div class="bname">Cluster Scanner</div><div class="bsub">市场聚类 · 10–30笔/天</div></div>
+    <div class="box bx-p"><div class="bname">Event Shock NLP</div><div class="bsub">事件冲击 · 5–10笔/天</div></div>
+    <div class="box bx-p"><div class="bname">Momentum</div><div class="bsub">动量跟踪 · 10–20笔/天</div></div>
+  </div>
+  <div class="row">
+    <div class="box bx-c"><div class="bname">Funding Rate Arb</div><div class="bsub">资金费率套利 · 现货/永续对冲</div></div>
+    <div class="box bx-e"><div class="bname">IV Surface Engine</div><div class="bsub">IV skew套利 · Calendar spread</div></div>
+    <div class="box bx-f"><div class="bname">FX Carry Engine</div><div class="bsub">利差套利 · 新闻事件驱动</div></div>
+    <div class="box bx-n"><div class="bname">Cross-Market Mom</div><div class="bsub">BTC→Poly · NASDAQ情绪传导</div></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- EMPIRICAL ALPHA PHASE 2 -->
+<div class="alpha-zone">
+  <div class="alpha-zone-title">🧠 EMPIRICAL ALPHA · Phase 2 · Pipeline 集成</div>
+  <div class="phase-band pb-p2">PHASE 2 · hard_gating 注入 orchestrator · counterfactual_labeler 全量记录</div>
+  <div class="lyr lyr-p2" style="margin-bottom:5px">
+    <div class="lhd" style="margin-bottom:6px">硬门控层 HardGating</div>
+    <div class="row">
+      <div class="box bx-g"><div class="bname">G1 · 流动性</div><div class="bsub">total_depth &lt; 50 → 拒<br>spread_z &gt; 2.5σ → 拒</div></div>
+      <div class="box bx-g"><div class="bname">G2 · Regime</div><div class="bsub">vol &gt; 4% → 拒<br>Hurst &lt; 0.5 → 拒</div></div>
+      <div class="box bx-g"><div class="bname">G3 · 跨截面</div><div class="bsub">cs_composite &lt; 0.35 → 拒<br>cs_tier &lt; 1 → 拒</div></div>
+      <div class="box bx-g"><div class="bname">G4 · Meta-Label</div><div class="bsub">Phase 3 激活后启用<br>score &lt; threshold → 拒</div></div>
+    </div>
+  </div>
+  <div class="lyr lyr-p2" style="margin-bottom:0">
+    <div class="lhd" style="margin-bottom:6px">反事实标签工厂 CounterfactualLabeler</div>
+    <div class="row">
+      <div class="box bx-g"><div class="bname">信号记录 100%</div><div class="bsub">通过 + 拒绝 全记录<br>50+ 特征快照 · Redis ZSet</div></div>
+      <div class="box bx-g"><div class="bname">多窗口标注</div><div class="bsub">5m · 30m · 2h · 8h<br>60s 后台 tick 自动打标</div></div>
+      <div class="box bx-g"><div class="bname">标签积累进度</div><div class="bsub">cfl:pending → cfl:complete<br>目标：5K → Phase 3 激活</div></div>
+    </div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- ════ NEW: AlphaCast PRIMARY ════ -->
+<div class="ai-zone ai-zone-acast">
+  <div class="ai-zone-title">🔮 AlphaCast · 时序预测（初次） <span class="bdg b-v8">V8 NEW</span></div>
+  <div class="row">
+    <div class="box bx-ac" style="flex:2"><div class="bname">Temporal Forecasting Model</div><div class="bsub">输入: 178维融合特征 + Alpha Engine 信号强度 + Redis历史序列<br>架构: Transformer Encoder + Temporal Attention · 时间位置编码<br>多任务输出: 预测收益 ŷ(t+1,...,t+N) · 不确定性 σ · 市场状态概率</div></div>
+    <div class="box bx-ac"><div class="bname">置信度校准</div><div class="bsub">Temperature Scaling<br>Platt Calibration<br>输出: P(profitable) + σ区间</div></div>
+    <div class="box bx-ac"><div class="bname">多市场头</div><div class="bsub">4个独立预测头<br>Poly / Crypto / Equity / Forex<br>市场条件自适应权重</div></div>
+  </div>
+  <div style="background:#0f0600;border:1px solid #92400e;border-radius:6px;padding:6px 10px;font-size:9px;color:#fcd34d;margin-top:6px">
+    📤 输出信号: ŷ(预测收益) · σ(不确定性区间) · conf(置信度[0,1]) · state(市场状态) → 传入 MCTS
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- ════ NEW: MCTS ════ -->
+<div class="ai-zone ai-zone-mcts">
+  <div class="ai-zone-title">♟ MCTS · 蒙特卡洛树搜索 <span class="bdg b-mcts">V8 NEW</span></div>
+  <div class="row">
+    <div class="box bx-mc"><div class="bname">Selection · 选择</div><div class="bsub">UCB1 公式权衡<br>探索 vs 利用<br>沿置信上界选节点</div></div>
+    <div class="box bx-mc"><div class="bname">Expansion · 扩展</div><div class="bsub">展开可行交易动作<br>买入/卖出/持仓/平仓<br>仓位大小离散化</div></div>
+    <div class="box bx-mc"><div class="bname">Simulation · 仿真</div><div class="bsub">AlphaCast 快速推演<br>N步前向滚动<br>蒙特卡洛rollout</div></div>
+    <div class="box bx-mc"><div class="bname">Backpropagation · 反传</div><div class="bsub">期望收益回溯更新<br>风险调整奖励<br>Sharpe-weighted value</div></div>
+  </div>
+
+  <!-- Path tree visualization -->
+  <div style="background:#010d1a;border:1px solid #0e4f70;border-radius:8px;padding:8px 10px;margin-top:8px">
+    <div style="font-size:9px;font-weight:600;color:#38bdf8;margin-bottom:6px;letter-spacing:.04em">推演路径树（示意）</div>
+    <div class="mcts-tree">
+      <div class="mcts-col">
+        <div class="mcts-node mn-root">当前状态 S₀</div>
+      </div>
+      <div style="align-self:center;color:#1e3a5c;padding:0 4px">▶</div>
+      <div class="mcts-col">
+        <div class="mcts-node mn-a">A: 做多30%<br>ŷ=+0.8%</div>
+        <div class="mcts-line">·</div>
+        <div class="mcts-node mn-b">B: 持仓观望<br>ŷ=+0.1%</div>
+        <div class="mcts-line">·</div>
+        <div class="mcts-node mn-c">C: 做空20%<br>ŷ=-0.3%</div>
+      </div>
+      <div style="align-self:flex-start;color:#1e3a5c;padding:0 4px;margin-top:8px">▶</div>
+      <div class="mcts-col">
+        <div class="mcts-node mn-best" style="min-width:90px">A₁: 加仓<br>E[R]=+1.2%</div>
+        <div class="mcts-line">·</div>
+        <div class="mcts-node mn-b">A₂: 锁利<br>E[R]=+0.6%</div>
+      </div>
+      <div style="align-self:flex-start;color:#065f46;padding:0 4px;margin-top:4px">▶</div>
+      <div class="mcts-col">
+        <div class="mcts-node mn-best" style="border-width:2px">★ 最优路径<br>A→A₁→...<br>Sharpe=2.1</div>
+      </div>
+    </div>
+  </div>
+  <div style="background:#010d1a;border:1px solid #0e4f70;border-radius:6px;padding:6px 10px;font-size:9px;color:#7dd3fc;margin-top:5px">
+    ⚙️ 参数: N步推演=5–20 · 模拟次数=200–1000 · 折现因子γ=0.95 · 风险惩罚λ=0.3 · 最优路径 → AlphaCast 二次校准
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- ════ NEW: AlphaCast RECALIBRATION ════ -->
+<div class="ai-zone ai-zone-acast">
+  <div class="ai-zone-title">🔮 AlphaCast · 二次校准 <span class="bdg b-v8">V8 NEW</span></div>
+  <div class="row">
+    <div class="box bx-ac" style="flex:2"><div class="bname">置信度过滤 · Confidence Gating</div><div class="bsub">输入: MCTS最优路径 · 路径期望收益 · 路径不确定性<br>再评估: 对最优路径重新运行 AlphaCast 推断 · 验证与初始预测的一致性<br>过滤规则: conf &lt; 0.55 → 拒绝 · σ过大 → 降仓 · 路径期望收益/风险比 &lt; 1.0 → 放弃</div></div>
+    <div class="box bx-ac"><div class="bname">决策精炼</div><div class="bsub">输出精确仓位比例<br>精确入场价格区间<br>止损/止盈目标位</div></div>
+    <div class="box bx-ac"><div class="bname">异常检测</div><div class="bsub">Regime 突变预警<br>流动性骤降检测<br>异常波动熔断</div></div>
+  </div>
+  <div style="background:#0f0600;border:1px solid #92400e;border-radius:6px;padding:6px 10px;font-size:9px;color:#fcd34d;margin-top:6px">
+    ✅ 通过: 高置信度决策 → Empirical Alpha P3 · MetaLabeler 最终门控 | ❌ 拒绝: 低置信信号 → CounterfactualLabeler 记录
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- EMPIRICAL ALPHA PHASE 3 -->
+<div class="alpha-zone">
+  <div class="alpha-zone-title">🧠 EMPIRICAL ALPHA · Phase 3 · Meta-Labeling V2（5K labels 后自动激活）</div>
+  <div class="phase-band pb-p3">PHASE 3 · LightGBM ranking · top-decile filter · 每周滚动重训</div>
+  <div class="lyr lyr-p3" style="margin-bottom:0">
+    <div class="lhd" style="margin-bottom:6px">MetaLabeler V2</div>
+    <div class="row">
+      <div class="box bx-a"><div class="bname">LightGBM Binary</div><div class="bsub">input: 50+ features + cs_* + AlphaCast.conf + MCTS.value<br>output: P(profitable) ∈ [0,1] · 时序 train/val 分割（防 look-ahead）</div></div>
+      <div class="box bx-a"><div class="bname">Top-Decile Filter (G4)</div><div class="bsub">threshold = percentile(val_preds, 90)<br>score ≥ threshold → 执行<br>预期 lift: 1.3–1.8x · IC: 0.06–0.12</div></div>
+      <div class="box bx-a"><div class="bname">自动生命周期</div><div class="bsub">n_complete≥5K → 首次训练<br>每7天 → 滚动30天窗口重训<br>IC衰减 → 触发告警 + 重训</div></div>
+    </div>
+    <div class="fb" style="margin-top:6px"><div class="fb-ttl">♻️ 反馈回路 A+B+C（含V8扩展）</div>A: 标签积累→模型精度提升 | B: feature_importance 审查→特征工程迭代 | C: gate.stats()偏移→参数调整 | <strong>V8新增D: MCTS仿真路径回测→奖励函数校准</strong></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- L4 Decision -->
+<div class="lyr lyr-decide">
+  <div class="lhd">⚖️ L4 · 投资组合决策与风控层</div>
+  <div class="row">
+    <div class="box bx-g" style="flex:3"><div class="bname">多因子信号融合器（动态权重）+ AlphaCast 校正</div><div class="bsub">Poly-Spread 18% · OBI 16% · OFI 12% · Prob 16% · Temporal 16% · Crypto-Funding 8% · IV Surface 6% · FX Carry 5% · Cross-Mom 3%<br>权重按历史夏普动态调整 · AlphaCast置信度作为乘数加权最终仓位</div></div>
+  </div>
+  <div class="row">
+    <div class="box bx-g"><div class="bname">仓位控制</div><div class="bsub">Poly ≤$100 · Crypto ≤$500<br>股票 ≤$1000 · 外汇 ≤1手<br>MCTS最优仓位建议参考</div></div>
+    <div class="box bx-g"><div class="bname">组合 VaR 95%</div><div class="bsub">跨市场相关矩阵<br>BTC-NASDAQ ρ≈0.7<br>AlphaCast σ入VaR计算</div></div>
+    <div class="box bx-g"><div class="bname">日亏损硬停</div><div class="bsub">组合总亏损≤$300/天<br>自动暂停所有市场</div></div>
+    <div class="box bx-g"><div class="bname">Kelly Criterion</div><div class="bsub">仓位上限≤25% Kelly<br>按市场分别计算</div></div>
+  </div>
+  <div class="row">
+    <div class="box bx-r"><div class="bname">PDT Counter</div><div class="bsub">日内交易次数≤3/5日</div></div>
+    <div class="box bx-r"><div class="bname">Funding Guard</div><div class="bsub">资金费率成本&gt;edge→强制平仓</div></div>
+    <div class="box bx-r"><div class="bname">Liquidation Mon</div><div class="bsub">强平距离&lt;5%→自动减仓</div></div>
+    <div class="box bx-r"><div class="bname">Settlement Tracker</div><div class="bsub">T+2追踪 · 防Free Riding</div></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- L5 Router -->
+<div class="lyr lyr-route">
+  <div class="lhd">🔀 L5 · 智能订单路由层</div>
+  <div class="row">
+    <div class="box bx-o" style="flex:2"><div class="bname">Smart Order Router（市场感知）</div><div class="bsub">根据 UnifiedOrder.market 路由至对应适配器 · Limit Order 优先 · 改单优先于撤单+重下 · MCTS最优执行时机</div></div>
+    <div class="box bx-o"><div class="bname">Order State Machine</div><div class="bsub">NEW→POSTED→PARTIAL<br>→FILLED/CANCELED<br>全市场统一状态追踪</div></div>
+    <div class="box bx-pk"><div class="bname">Behavior Humanizer</div><div class="bsub">随机延迟 0.1–0.5s<br>Poisson 节奏模拟<br>±0.002 价格微扰</div></div>
+  </div>
+</div>
+<div class="darr">↓</div>
+
+<!-- HARNESS PIPELINE wrapper -->
+<div class="harn-zone">
+  <div class="harn-zone-title">⚙️ HARNESS · 执行流水线 <span class="bdg b-v8">V8 NEW WRAPPER</span></div>
+
+  <!-- L6 Execution -->
+  <div class="lyr lyr-exec" style="margin-bottom:6px">
+    <div class="lhd">⚡ L6 · 多路并行执行</div>
+    <div class="exec-grid">
+      <div class="exec-lane el-p">
+        <div class="el-ttl">🟢 POLYMARKET</div>
+        <div class="row"><div class="box bx-p" style="min-width:0"><div class="bname">美国住宅IP池</div><div class="bsub">Virginia/NY/IL · 行为伪装 · Session绑定</div></div></div>
+        <div style="font-size:9px;color:var(--poly-lt);margin-top:5px">→ REST POST /order<br>→ Polygon RPC 广播<br>→ fill_price → Redis</div>
+      </div>
+      <div class="exec-lane el-c">
+        <div class="el-ttl">🟣 CRYPTO PERPS</div>
+        <div class="row"><div class="box bx-c" style="min-width:0"><div class="bname">直连/代理可选</div><div class="bsub">Binance直连 · OKX可代理 · 5–30ms</div></div></div>
+        <div style="font-size:9px;color:var(--cryp-lt);margin-top:5px">→ 交易所REST<br>→ 资金费率实时监控<br>→ 强平预警减仓</div>
+      </div>
+      <div class="exec-lane el-e">
+        <div class="el-ttl">🔵 EQUITY/OPTIONS</div>
+        <div class="row"><div class="box bx-e" style="min-width:0"><div class="bname">Alpaca / IB Gateway</div><div class="bsub">官方API直连 · PDT守护 · ib_insync</div></div></div>
+        <div style="font-size:9px;color:var(--equi-lt);margin-top:5px">→ Alpaca REST order<br>→ IB TWS port 7497<br>→ T+2 结算追踪</div>
+      </div>
+      <div class="exec-lane el-f">
+        <div class="el-ttl">🟡 FOREX MT4/5</div>
+        <div class="row"><div class="box bx-f" style="min-width:0"><div class="bname">ZMQ → MT4 EA</div><div class="bsub">手数换算 · ECN执行 · DWX桥</div></div></div>
+        <div style="font-size:9px;color:var(--fore-lt);margin-top:5px">→ pyzmq PUSH<br>→ DWX EA 本地执行<br>→ 成交回执 ZMQ PULL</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Harness sub-systems -->
+  <div class="row" style="margin-bottom:6px">
+    <div class="box bx-h"><div class="bname">📋 日志 Logging</div><div class="bsub">结构化 JSON 日志 · 全链路追踪ID<br>信号→下单→成交 全记录</div></div>
+    <div class="box bx-h"><div class="bname">🔔 告警 Alerting</div><div class="bsub">Telegram / 钉钉<br>风控/IC衰减/强平/PDT<br>AlphaCast置信度骤降告警</div></div>
+    <div class="box bx-h"><div class="bname">📊 监控 Monitoring</div><div class="bsub">FastAPI + WebSocket SPA<br>秒级刷新 · gate_pass_rate<br>MCTS仿真次数 · AlphaCast IC</div></div>
+    <div class="box bx-h"><div class="bname">🔄 回测 Backtesting</div><div class="bsub">多市场联合回测<br>含AlphaCast历史推演<br>MCTS路径离线验证</div></div>
+  </div>
+
+  <!-- L7 Settlement inside Harness -->
+  <div class="lyr lyr-settle" style="margin-bottom:0">
+    <div class="lhd">🏦 L7 · 多市场结算与 P&L 汇总</div>
+    <div class="row">
+      <div class="box bx-p"><div class="bname">链上结算</div><div class="bsub">Polygon RPC · Gas优化 · 即时确认</div></div>
+      <div class="box bx-e"><div class="bname">T+2 股票结算</div><div class="bsub">DTCC清算 · 可用余额实时</div></div>
+      <div class="box bx-f"><div class="bname">外汇即时结算</div><div class="bsub">保证金实时扣减 · swap入账</div></div>
+      <div class="box bx-n" style="flex:2"><div class="bname">统一 P&L 聚合器</div><div class="bsub">全市场头寸汇总USD · 实时Sharpe/Sortino/MaxDD<br>AlphaCast预测误差追踪 · MCTS路径准确率统计 · 写入 Redis portfolio:*</div></div>
+    </div>
+    <div class="fb" style="margin-top:6px"><div class="fb-ttl">♻️ V8 闭环反馈：实盘结果 → AlphaCast 在线校准 → MCTS 奖励函数更新 → MetaLabeler 重训触发</div>成交均价误差 / 预测收益 vs 实际收益 / MCTS路径成功率 → 全部写回 Redis → 触发各模块自适应更新</div>
+  </div>
+</div>
+
+</div><!-- end left col -->
+
+<!-- ── Right: infra sidebar ── -->
+<div class="infra-col">
+
+<div class="infra-block" style="border-color:var(--acast);background:#0d0800">
+  <div class="infra-ttl" style="color:var(--acast)">🔮 AlphaCast 模型规格</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--acast)"></div><div><div class="infra-label">架构</div><div class="infra-sub">Transformer Encoder 6层 · 8头注意力 · d_model=256</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--acast)"></div><div><div class="infra-label">输入</div><div class="infra-sub">178维融合特征 · 60步历史窗口 · 多市场联合</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--acast)"></div><div><div class="infra-label">输出</div><div class="infra-sub">ŷ(N步) · σ(不确定性) · conf(置信度) · state(4市场)</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--acast)"></div><div><div class="infra-label">训练</div><div class="infra-sub">离线 GPU · 滚动2周窗口 · 在线微调</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--acast)"></div><div><div class="infra-label">推理延迟</div><div class="infra-sub">&lt;10ms (TorchScript) · ONNX备选</div></div></div>
+</div>
+
+<div class="infra-block" style="border-color:var(--resnet);background:#0c0115">
+  <div class="infra-ttl" style="color:var(--resnet)">🧬 ResNet 模型规格</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--resnet)"></div><div><div class="infra-label">架构</div><div class="infra-sub">6残差块 · Conv1D(64→128→256) · BatchNorm</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--resnet)"></div><div><div class="infra-label">输入</div><div class="infra-sub">50+ Empirical Alpha特征 + 原始OHLCV · 240步序列</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--resnet)"></div><div><div class="infra-label">输出</div><div class="infra-sub">128维嵌入向量 · 与经验特征门控融合</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--resnet)"></div><div><div class="infra-label">推理延迟</div><div class="infra-sub">&lt;5ms · 与AlphaCast共享推理线程</div></div></div>
+</div>
+
+<div class="infra-block" style="border-color:var(--mcts);background:#010b15">
+  <div class="infra-ttl" style="color:var(--mcts)">♟ MCTS 运行参数</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--mcts)"></div><div><div class="infra-label">推演步数 N</div><div class="infra-sub">5–20步 · 按市场流动性动态调整</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--mcts)"></div><div><div class="infra-label">每步仿真</div><div class="infra-sub">200–1000次 rollout · AlphaCast快速推断</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--mcts)"></div><div><div class="infra-label">奖励函数</div><div class="infra-sub">Sharpe-weighted · 风险惩罚λ=0.3 · 折现γ=0.95</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--mcts)"></div><div><div class="infra-label">总耗时</div><div class="infra-sub">&lt;200ms · 异步并行 · 不阻塞数据流</div></div></div>
+</div>
+
+<div class="infra-block">
+  <div class="infra-ttl">🤖 ML / AI 工具层</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--alph)"></div><div><div class="infra-label">多市场特征工程</div><div class="infra-sub">OBI/OFI · 资金费率 · IV/Greeks · FX利差</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--alph)"></div><div><div class="infra-label">LSTM/Transformer 训练</div><div class="infra-sub">多市场迁移学习 · 离线 GPU 训练</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--alph)"></div><div><div class="infra-label">跨市场相关矩阵</div><div class="infra-sub">BTC-NASDAQ · DXY-Gold · 滚动30天更新</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--alph)"></div><div><div class="infra-label">NLP 事件提取</div><div class="infra-sub">市场标题语义 · 跨市场影响图</div></div></div>
+</div>
+
+<div class="infra-block">
+  <div class="infra-ttl">📅 多市场交易日历</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--poly)"></div><div><div class="infra-label">Poly/Crypto 24/7</div><div class="infra-sub">is_session_open() = True</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--equi)"></div><div><div class="infra-label">NYSE 9:30–16:00 ET</div><div class="infra-sub">pandas_market_calendars · 假期/半日</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--fore)"></div><div><div class="infra-label">Forex 24/5</div><div class="infra-sub">周一05:00–周五21:00 UTC · 新闻前5min停单</div></div></div>
+</div>
+
+<div class="infra-block">
+  <div class="infra-ttl">🖥️ 监控 / Dashboard</div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--equi)"></div><div><div class="infra-label">SPA Dashboard</div><div class="infra-sub">FastAPI + WebSocket · 秒级刷新</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--equi)"></div><div><div class="infra-label">V8 新增指标</div><div class="infra-sub">AlphaCast IC · MCTS路径准确率 · ResNet嵌入漂移</div></div></div>
+  <div class="infra-row"><div class="infra-dot" style="background:var(--equi)"></div><div><div class="infra-label">进程守护</div><div class="infra-sub">Docker + Supervisor · 各适配器独立守护</div></div></div>
+</div>
+
+</div><!-- end infra col -->
+</div><!-- end main-layout -->
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 2 · AI ENGINE DETAIL
+════════════════════════════════════ -->
+<div id="pg-ai" class="pg">
+
+<div class="stats-bar">
+  <div class="stat sv-res"><div class="stat-val">6</div><div class="stat-lbl">ResNet 残差块</div></div>
+  <div class="stat sv-res"><div class="stat-val">128d</div><div class="stat-lbl">深度嵌入维度</div></div>
+  <div class="stat sv-ac"><div class="stat-val">6L·8H</div><div class="stat-lbl">AlphaCast Transformer</div></div>
+  <div class="stat sv-ac"><div class="stat-val">×2</div><div class="stat-lbl">初次+校准</div></div>
+  <div class="stat sv-mc"><div class="stat-val">N=20</div><div class="stat-lbl">MCTS 推演步数</div></div>
+  <div class="stat sv-mc"><div class="stat-val">1000</div><div class="stat-lbl">每步仿真次数</div></div>
+  <div class="stat sv-p"><div class="stat-val">&lt;220ms</div><div class="stat-lbl">AI链路总延迟</div></div>
+</div>
+
+<div class="grid2">
+<div>
+
+<!-- ResNet detail -->
+<div class="lyr lyr-resnet">
+  <div class="lhd">🧬 ResNet · 残差卷积网络结构</div>
+
+  <div style="font-size:10px;color:var(--tx2);margin-bottom:6px">层级结构（输入→深度嵌入）</div>
+  <div class="resnet-layers">
+    <div class="rl rl-a">Input<br>50+OHLCV<br>dim=240</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-a">Embed<br>Linear<br>d=64</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-a">ResBlock 1<br>Conv1D(64)<br>+BN+ReLU</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-skip">Skip ⊕</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-b">ResBlock 2-3<br>Conv1D(128)</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-skip">Skip ⊕</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-b">ResBlock 4-6<br>Conv1D(256)</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-a">GAP<br>Pool</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-a">FC<br>256→128</div>
+    <span class="rl-arr">→</span>
+    <div class="rl rl-a" style="border-color:#a855f7;color:#f0abfc">Emb<br>128d</div>
+  </div>
+
+  <div class="row" style="margin-top:8px">
+    <div class="box bx-res"><div class="bname">多尺度卷积</div><div class="bsub">kernel_size=[3,5,9] 并行分支<br>融合短/中/长期模式<br>捕获不同频率价格节奏</div></div>
+    <div class="box bx-res"><div class="bname">恒等映射</div><div class="bsub">残差连接防梯度消失<br>深层网络稳定训练<br>特征复用避免退化</div></div>
+    <div class="box bx-res"><div class="bname">训练目标</div><div class="bsub">对比学习预训练<br>正例=同市场相似状态<br>微调=AlphaCast联合训练</div></div>
+  </div>
+</div>
+
+<!-- AlphaCast detail -->
+<div class="lyr lyr-acast" style="margin-top:6px">
+  <div class="lhd">🔮 AlphaCast · Transformer 时序预测</div>
+  <div class="row">
+    <div class="box bx-ac" style="flex:2"><div class="bname">Encoder-only Transformer</div><div class="bsub">6层 · 8头自注意力 · d_model=256 · FFN=1024<br>时间位置编码 (可学习) · Dropout=0.1<br>输入: 60步 × 178维融合特征序列</div></div>
+    <div class="box bx-ac"><div class="bname">多任务输出头</div><div class="bsub">收益预测头: FC→1 (ŷ)<br>不确定性头: FC→1 (σ) NLL损失<br>状态分类头: FC→4 (状态概率)</div></div>
+  </div>
+  <div class="ac-output">
+    <div class="ac-out-card"><div class="ac-out-val">ŷ</div><div class="ac-out-lbl">预测收益率 (N步)</div></div>
+    <div class="ac-out-card"><div class="ac-out-val">σ</div><div class="ac-out-lbl">不确定性区间</div></div>
+    <div class="ac-out-card"><div class="ac-out-val">conf</div><div class="ac-out-lbl">置信度 [0,1]</div></div>
+    <div class="ac-out-card"><div class="ac-out-val">S</div><div class="ac-out-lbl">市场状态概率</div></div>
+  </div>
+  <div style="margin-top:8px">
+    <div style="font-size:10px;font-weight:600;color:var(--acast);margin-bottom:5px">二次校准流程（MCTS后）</div>
+    <div class="code">
+<span class="cc"># MCTS最优路径传入</span>
+path = mcts.best_path()  <span class="cc"># [action_1, ..., action_N]</span>
+<span class="cc"># 重新推断路径终态</span>
+recalib_pred = alphacast.infer(fused_features, path=path)
+<span class="cc"># 置信度过滤</span>
+<span class="ck">if</span> recalib_pred.conf < <span class="cv">0.55</span> <span class="ck">or</span> recalib_pred.sigma > <span class="cv">threshold_sigma</span>:
+    labeler.record(signal, decision=<span class="cs">"REJECTED_RECALIB"</span>)
+    <span class="ck">return</span> <span class="cv">None</span>
+<span class="cc"># 精炼仓位大小</span>
+size = kelly_fraction * recalib_pred.conf * mcts.path_value
+    </div>
+  </div>
+</div>
+
+</div>
+<div>
+
+<!-- MCTS detail -->
+<div class="lyr lyr-mcts">
+  <div class="lhd">♟ MCTS · 蒙特卡洛树搜索详解</div>
+  <div class="row">
+    <div class="box bx-mc"><div class="bname">动作空间设计</div><div class="bsub">方向: Long / Short / Hold / Close<br>仓位: {10%, 20%, 30%, 50%} Kelly<br>每步合法动作 ≤ 16个</div></div>
+    <div class="box bx-mc"><div class="bname">奖励函数</div><div class="bsub">R = ŷ · conf - λ·σ - cost<br>λ=0.3(风险惩罚) · γ=0.95(折现)<br>cost=spread+commission</div></div>
+    <div class="box bx-mc"><div class="bname">UCB1 选择</div><div class="bsub">UCB = Q(s,a) + c·√(ln N/n)<br>c=1.4(探索系数)<br>虚损(Virtual Loss)防重复</div></div>
+  </div>
+  <div class="row" style="margin-top:5px">
+    <div class="box bx-mc" style="flex:3"><div class="bname">并行化加速</div><div class="bsub">异步MCTS: 多线程并行rollout · AlphaCast批量推断(batch_size=32) · GPU并行仿真<br>目标: 1000次仿真 &lt; 200ms · 不阻塞实时数据流 · 仿真结果缓存30s</div></div>
+    <div class="box bx-mc"><div class="bname">降级模式</div><div class="bsub">高延迟时自动降为<br>贪心策略(N=1,M=50)<br>&lt;50ms 保证响应</div></div>
+  </div>
+
+  <div class="code" style="margin-top:8px">
+<span class="cc"># MCTS 主循环（伪代码）</span>
+<span class="ck">def</span> mcts_search(state, alphacast, n_sim=<span class="cv">1000</span>, N=<span class="cv">10</span>):
+    root = MCTSNode(state)
+    <span class="ck">for</span> _ <span class="ck">in</span> range(n_sim):
+        node = select(root)          <span class="cc"># UCB1 selection</span>
+        node = expand(node)          <span class="cc"># 展开合法动作</span>
+        value = simulate(node, alphacast, N)  <span class="cc"># AlphaCast rollout</span>
+        backprop(node, value)        <span class="cc"># 价值回传</span>
+    <span class="ck">return</span> best_path(root)          <span class="cc"># 最优路径提取</span>
+
+<span class="cc"># simulate: N步AlphaCast快速推断</span>
+<span class="ck">def</span> simulate(node, model, N):
+    total = <span class="cv">0</span>
+    <span class="ck">for</span> step <span class="ck">in</span> range(N):
+        pred = model.fast_infer(node.state)
+        reward = pred.y * pred.conf - λ * pred.sigma
+        total += γ**step * reward
+    <span class="ck">return</span> total
+  </div>
+</div>
+
+<!-- Timing waterfall -->
+<div class="lyr lyr-src" style="margin-top:6px">
+  <div class="lhd">⏱ AI推演链路延迟分解</div>
+  <table class="cmp">
+    <tr><th>模块</th><th>延迟</th><th>并行?</th><th>说明</th></tr>
+    <tr><td class="tc-res">ResNet 推断</td><td class="tc-g">&lt;5ms</td><td class="tc-g">✓</td><td>与特征提取并行</td></tr>
+    <tr><td>特征融合</td><td class="tc-g">&lt;2ms</td><td>—</td><td>矩阵拼接+门控</td></tr>
+    <tr><td class="tc-ac">AlphaCast 初次</td><td class="tc-g">&lt;10ms</td><td>✓</td><td>TorchScript推断</td></tr>
+    <tr><td class="tc-mc">MCTS 推演</td><td class="tc-y">&lt;200ms</td><td>✓</td><td>异步并行不阻塞</td></tr>
+    <tr><td class="tc-ac">AlphaCast 校准</td><td class="tc-g">&lt;8ms</td><td>—</td><td>单路径再推断</td></tr>
+    <tr><td>MetaLabeler G4</td><td class="tc-g">&lt;2ms</td><td>—</td><td>LightGBM predict</td></tr>
+    <tr><td style="font-weight:600">AI链路合计</td><td class="tc-g" style="font-weight:600">&lt;220ms</td><td>—</td><td>异步设计，不影响数据流</td></tr>
+  </table>
+</div>
+
+</div>
+</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 3 · EMPIRICAL ALPHA
+════════════════════════════════════ -->
+<div id="pg-alpha" class="pg">
+
+<div class="stats-bar">
+  <div class="stat sv-p"><div class="stat-val">P1</div><div class="stat-lbl">3 文件 · 特征基础</div></div>
+  <div class="stat sv-g"><div class="stat-val">P2</div><div class="stat-lbl">2 文件 · 标签工厂</div></div>
+  <div class="stat sv-p"><div class="stat-val">P3</div><div class="stat-lbl">1 文件 · ML 过滤</div></div>
+  <div class="stat sv-b"><div class="stat-val">50+</div><div class="stat-lbl">特征维度</div></div>
+  <div class="stat sv-o"><div class="stat-val">5K</div><div class="stat-lbl">激活阈值</div></div>
+  <div class="stat sv-r"><div class="stat-val">A+B+C+D</div><div class="stat-lbl">反馈回路</div></div>
+</div>
+
+<div class="grid3">
+
+<div class="lyr lyr-p1">
+  <div class="lhd"><span class="phase-band pb-p1" style="margin-bottom:0">PHASE 1</span></div>
+  <div style="margin-top:8px">
+  <div class="box bx-a" style="margin-bottom:5px"><div class="bname">market_state_buffer.py</div><div class="bsub">MarketSnapshot (frozen dataclass)<br>deque(maxlen=3600) · O(1) push<br>get_window(s) · price/obi/spread/flow series<br>BufferRegistry · prune_stale()</div></div>
+  <div class="box bx-a" style="margin-bottom:5px"><div class="bname">feature_engine.py</div><div class="bsub">velocity: price_vel/acc/mom · obi_vel/mean/std<br>× 6 时间窗 [5,15,30,60,120,300]s<br>regime: hurst_rs · autocorr_lag1 · vol_ratio<br>micro: depth_imbalance · spread_z · obi<br>flow: buy_ratio · net_flow · trade_rate</div></div>
+  <div class="box bx-a"><div class="bname">cross_section.py</div><div class="bsub">10 维排名特征 · cs_rank_* 百分位<br>cs_composite = 加权综合评分<br>cs_tier: 0–3 · 每 5s update_universe()</div></div>
+  <div class="box bx-res" style="margin-top:5px"><div class="bname">→ ResNet 接口 <span class="bdg b-v8">V8</span></div><div class="bsub">50+特征 → ResNet输入<br>与OHLCV一起编码<br>输出128维嵌入并入融合层</div></div>
+  </div>
+</div>
+
+<div class="lyr lyr-p2">
+  <div class="lhd"><span class="phase-band pb-p2" style="margin-bottom:0">PHASE 2</span></div>
+  <div style="margin-top:8px">
+  <div class="box bx-g" style="margin-bottom:5px"><div class="bname">hard_gating.py</div><div class="bsub">G1 流动性: depth + spread_z<br>G2 Regime: vol + Hurst<br>G3 跨截面: cs_composite + cs_tier<br>G4 Meta: Phase 3 激活后生效<br><span style="color:#38bdf8">V8: G3参数由AlphaCast置信度动态调节</span></div></div>
+  <div class="box bx-g"><div class="bname">counterfactual_labeler.py</div><div class="bsub">100% 信号覆盖（含拒绝）<br>标签窗: 5m · 30m(主) · 2h · 8h<br>export_training_dataset(min=5K)<br><span style="color:#38bdf8">V8: 额外记录AlphaCast.conf + MCTS.value</span></div></div>
+  </div>
+</div>
+
+<div class="lyr lyr-p3">
+  <div class="lhd"><span class="phase-band pb-p3" style="margin-bottom:0">PHASE 3</span></div>
+  <div style="margin-top:8px">
+  <div class="box bx-a" style="margin-bottom:5px"><div class="bname">meta_labeler.py</div><div class="bsub">LightGBM binary · AUC metric<br>input: 50+ features + cs(10) + conf(AlphaCast) + MCTS.value = 64维<br>Top-decile: threshold = P90(val_preds)<br>每7天滚动30天重训</div></div>
+  <div class="box bx-a" style="margin-bottom:5px"><div class="bname">orchestrator_patch.py</div><div class="bsub">evaluate_signal() 串联全流程<br>asyncio 后台标签任务<br>auto-train on 5K labels<br><span style="color:#38bdf8">V8: 触发ResNet/AlphaCast在线校准</span></div></div>
+  </div>
+</div>
+
+</div>
+
+<!-- Four feedback loops -->
+<div class="lyr lyr-p3" style="margin-top:8px">
+  <div class="lhd">♻️ 四个自我改进反馈回路（V8）</div>
+  <div class="row">
+    <div class="box bx-a"><div class="bname">回路 A · 标签 → 模型精度</div><div class="bsub">cfl:complete 积累 → MetaLabeler 重训 → G4 threshold 更新 → 更多高质量标签 → 下次更好的模型</div></div>
+    <div class="box bx-a"><div class="bname">回路 B · 特征重要性 → 特征工程</div><div class="bsub">feature_importance() 每周审查 → 低重要性特征剔除 → 新特征假设 → FeatureEngine 更新</div></div>
+    <div class="box bx-a"><div class="bname">回路 C · 门控统计 → 参数调整</div><div class="bsub">gate.stats() 监控拒绝率 → pass_rate 偏移 → G1-G3 参数动态调整 → IC 衰减告警</div></div>
+    <div class="box bx-mc"><div class="bname">回路 D · MCTS路径 → 奖励校准 <span class="bdg b-v8">V8</span></div><div class="bsub">实盘成交对比MCTS预测路径 → 路径准确率统计 → 奖励函数λ/γ参数更新 → AlphaCast在线微调</div></div>
+  </div>
+</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 4 · PIPELINE FLOW
+════════════════════════════════════ -->
+<div id="pg-pipeline" class="pg">
+
+<div class="flow-sig">
+  <div class="flow-sig-ttl">完整信号处理链（V8 · 每次 Alpha Engine 触发）</div>
+  <div class="flow-nodes">
+    <div class="fn fn-h">WS Snapshot<br>↓ push buffer</div><span class="fn-arr">→</span>
+    <div class="fn fn-p1">Phase 1<br>50+ features</div><span class="fn-arr">→</span>
+    <div class="fn fn-res">ResNet<br>128d embed</div><span class="fn-arr">→</span>
+    <div class="fn fn-res">Fusion<br>178d vector</div><span class="fn-arr">→</span>
+    <div class="fn fn-p1">CrossSection<br>cs_composite</div><span class="fn-arr">→</span>
+    <div class="fn fn-p2">HardGating<br>G1→G2→G3</div><span class="fn-arr">→</span>
+    <div class="fn fn-lb">CFL Record<br>ALL signals</div><span class="fn-arr">→</span>
+    <div class="fn fn-ac">AlphaCast<br>ŷ + σ + conf</div><span class="fn-arr">→</span>
+    <div class="fn fn-mc">MCTS<br>N步推演</div><span class="fn-arr">→</span>
+    <div class="fn fn-ac">AlphaCast<br>二次校准</div><span class="fn-arr">→</span>
+    <div class="fn fn-p3">MetaLabeler<br>G4 top-decile</div><span class="fn-arr">→</span>
+    <div class="fn fn-h">Portfolio Risk<br>VaR · Kelly</div><span class="fn-arr">→</span>
+    <div class="fn fn-harn">Harness<br>执行+监控</div>
+  </div>
+</div>
+
+<div class="grid2">
+<div>
+<div class="lyr lyr-data">
+  <div class="lhd">📊 V7→V8 关键升级对比</div>
+  <table class="cmp">
+    <tr><th>环节</th><th>V7 原始</th><th>V8 融合</th></tr>
+    <tr><td>特征提取</td><td class="tc-b">50+ 经验特征</td><td class="tc-res">+ResNet 128d 深度嵌入 → 178d融合</td></tr>
+    <tr><td>信号预测</td><td class="tc-b">AlphaEngine置信度&gt;0.5</td><td class="tc-ac">AlphaCast Transformer ŷ+σ+conf</td></tr>
+    <tr><td>路径规划</td><td>无</td><td class="tc-mc">MCTS N步最优路径推演</td></tr>
+    <tr><td>决策校准</td><td class="tc-g">G4 MetaLabeler</td><td class="tc-ac">+AlphaCast二次校准 → 双重过滤</td></tr>
+    <tr><td>执行层</td><td class="tc-b">L5-L7 路由+执行+结算</td><td class="tc-harn">统一包装为 Harness 流水线</td></tr>
+    <tr><td>反馈回路</td><td class="tc-g">A+B+C</td><td class="tc-mc">+D: MCTS路径结果反馈</td></tr>
+    <tr><td>MetaLabeler输入</td><td class="tc-b">50+cs+conf = 62维</td><td class="tc-ac">+AlphaCast.conf+MCTS.value = 64维</td></tr>
+    <tr><td>AI推理延迟</td><td class="tc-g">&lt;5ms (LightGBM)</td><td class="tc-y">&lt;220ms (异步并行)</td></tr>
+  </table>
+</div>
+
+<div class="lyr lyr-p2" style="margin-top:6px">
+  <div class="lhd">Phase 2 · 门控决策树（V8）</div>
+  <div class="code">
+result = gate.evaluate(features, cs_features, signal_type,
+                       alphacast_conf=<span class="cv">0.73</span>, mcts_value=<span class="cv">1.2</span>)
+<span class="cc"># G1: 流动性</span>
+total_depth >= <span class="cv">50</span> <span class="ck">and</span> spread_z < <span class="cv">2.5</span>
+<span class="cc"># G2: Regime 适配</span>
+vol < <span class="cv">0.04</span> <span class="ck">and</span> hurst >= <span class="cv">0.5</span>  <span class="cc"># (momentum)</span>
+<span class="cc"># G3: 跨截面质量 + V8: AlphaCast辅助动态调节阈值</span>
+cs_composite >= <span class="cv">0.35</span> * (<span class="cv">1</span> - <span class="cv">0.1</span>*alphacast_conf) <span class="ck">and</span> cs_tier >= <span class="cv">1</span>
+<span class="cc"># AlphaCast 初次预测</span>
+ac = alphacast.predict(fused_178d_features)    <span class="cc"># ŷ, σ, conf</span>
+<span class="cc"># MCTS 路径推演</span>
+path = mcts.search(state, alphacast, n_sim=<span class="cv">1000</span>, N=<span class="cv">10</span>)
+<span class="cc"># AlphaCast 二次校准</span>
+final = alphacast.recalibrate(fused, path)
+<span class="ck">if</span> final.conf < <span class="cv">0.55</span>: <span class="ck">return</span> REJECT
+<span class="cc"># G4: MetaLabeler (Phase 3)</span>
+score = meta_labeler.score(features + [final.conf, path.value])
+<span class="ck">if</span> score < threshold_p90: <span class="ck">return</span> REJECT
+<span class="cc"># 无论结果，全记录</span>
+cf_labeler.record(make_record(..., mcts_path=path, ac_conf=final.conf))
+  </div>
+</div>
+</div>
+
+<div>
+<div class="lyr lyr-p3">
+  <div class="lhd">Phase 3 · MetaLabeler V8 生命周期</div>
+  <table class="cmp">
+    <tr><th>状态</th><th>触发条件</th><th>行为</th></tr>
+    <tr><td class="tc-b">未激活</td><td>n_complete &lt; 5K</td><td>G4跳过 · AlphaCast conf独立过滤</td></tr>
+    <tr><td class="tc-g">首次训练</td><td>n_complete ≥ 5K</td><td>auto train + 校准threshold(含MCTS特征)</td></tr>
+    <tr><td class="tc-p">线上推理</td><td>is_active = True</td><td>每信号score() · G4过滤</td></tr>
+    <tr><td class="tc-p">周期重训</td><td>7天后</td><td>滚动30d · 重校准 · MCTS奖励更新</td></tr>
+    <tr><td class="tc-o">降级</td><td>AUC &lt; 0.52</td><td>is_active=False · 告警 · 回路D触发</td></tr>
+  </table>
+  <div class="fb" style="margin-top:6px">
+    <div class="fb-ttl">V8 性能目标</div>
+    base_rate ~48–55% → top-decile ~65–78% · Lift 1.4–2.0x · IC 0.07–0.14 · AUC &gt; 0.60<br>
+    MCTS路径准确率 &gt; 65% · AlphaCast IC &gt; 0.08 · ResNet嵌入稳定性 cosine_sim &gt; 0.85
+  </div>
+</div>
+
+<div class="lyr lyr-exec" style="margin-top:6px">
+  <div class="lhd">V8 · 四市场执行路径对比</div>
+  <table class="cmp">
+    <tr><th>市场</th><th>代理</th><th>延迟</th><th>特殊规则</th></tr>
+    <tr><td class="tc-g">Polymarket</td><td class="tc-o">住宅IP必须</td><td>15–40ms</td><td>风控检测 · 链上Gas · MCTS偏好限价</td></tr>
+    <tr><td class="tc-p">Crypto Perps</td><td class="tc-y">部分需要</td><td>5–30ms</td><td>资金费率 · 强平监控 · MCTS最优开仓时机</td></tr>
+    <tr><td class="tc-b">US Equity</td><td class="tc-g">无需代理</td><td>10–30ms</td><td>PDT · T+2 · AlphaCast Greeks预测</td></tr>
+    <tr><td class="tc-y">Forex MT4</td><td class="tc-g">无需代理</td><td>10–30ms</td><td>手数 · pip · Swap · MCTS过夜成本评估</td></tr>
+  </table>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 5 · NETWORK
+════════════════════════════════════ -->
+<div id="pg-network" class="pg">
+
+<div class="lyr lyr-src">
+  <div class="lhd">📡 网络拓扑 · US East VPS 核心</div>
+  <div class="row">
+    <div class="box bx-e" style="flex:2"><div class="bname">US East VPS (Virginia / NYC · 8核 16G)</div><div class="bsub">Poly/Crypto WS 直连 1–10ms · Equity WS 直连 · 策略引擎 · Redis 总线 · Docker · Supervisor<br><span style="color:var(--resnet-lt)">V8新增: ResNet+AlphaCast ONNX推断服务 · MCTS异步任务池</span></div></div>
+    <div class="box bx-f"><div class="bname">Windows VPS (MT4专用)</div><div class="bsub">MT4 终端 · DWX ZMQ EA · pyzmq tcp://127.0.0.1:32768</div></div>
+    <div class="box bx-n"><div class="bname">IB Gateway (本地/同VPS)</div><div class="bsub">ib_insync · TWS port 7497 · 需保持登录</div></div>
+    <div class="box bx-res"><div class="bname">GPU 训练服务器 <span class="bdg b-v8">V8</span></div><div class="bsub">离线训练: ResNet + AlphaCast<br>RTX 3090 / A100 · 每周推送新模型权重</div></div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:6px">
+<div>
+<div class="lyr lyr-p2">
+  <div class="lhd">🛡️ Poly/Crypto 执行出口（住宅代理）</div>
+  <div class="row">
+    <div class="box bx-f"><div class="bname">IP #1 Virginia</div><div class="bsub">主力 · Session A · 延迟监控</div></div>
+    <div class="box bx-f"><div class="bname">IP #2 New York</div><div class="bsub">备用 · Session B · 独立Cookie</div></div>
+    <div class="box bx-f"><div class="bname">IP #3 Illinois</div><div class="bsub">轮换 · 5–15min冷却</div></div>
+  </div>
+  <div style="margin-top:6px;background:var(--gate-bg);border:1px solid var(--gate);border-radius:6px;padding:6px 10px;font-size:9px;color:var(--gate-lt)">
+    ✅ 最优路径：VPS WS直连(1–10ms) → 策略+ResNet+AlphaCast+MCTS(异步&lt;220ms) → 住宅IP+行为伪装(+100–300ms) → 市场
+  </div>
+</div>
+<div class="lyr lyr-data" style="margin-top:6px">
+  <div class="lhd">🔵 AI推断服务内网部署 <span class="bdg b-v8">V8</span></div>
+  <div class="row">
+    <div class="box bx-res"><div class="bname">ResNet ONNX服务</div><div class="bsub">localhost:8001 · 批量推断<br>共享推断池 · &lt;5ms</div></div>
+    <div class="box bx-ac"><div class="bname">AlphaCast TorchScript</div><div class="bsub">localhost:8002 · &lt;10ms<br>主推断 + 校准复用同实例</div></div>
+    <div class="box bx-mc"><div class="bname">MCTS 异步任务池</div><div class="bsub">Celery/asyncio · 8 workers<br>Redis任务队列 · 结果缓存30s</div></div>
+  </div>
+</div>
+</div>
+<div>
+<div class="lyr lyr-src">
+  <div class="lhd">📊 方案对比（延迟基准 · V8）</div>
+  <table class="cmp">
+    <tr><th>方案</th><th>风控安全</th><th>数据延迟</th><th>AI推断</th><th>下单</th><th>结论</th></tr>
+    <tr><td>VPS直连</td><td class="tc-r">⭐⭐</td><td class="tc-g">1–10ms</td><td class="tc-g">&lt;220ms</td><td class="tc-g">5–20ms</td><td class="tc-r">❌ 易封</td></tr>
+    <tr><td>全住宅IP</td><td class="tc-g">⭐⭐⭐⭐⭐</td><td class="tc-r">50–200ms</td><td class="tc-g">&lt;220ms</td><td class="tc-r">80–250ms</td><td class="tc-r">❌ 延迟</td></tr>
+    <tr><td>US VPS + 住宅IP ✅</td><td class="tc-g">⭐⭐⭐⭐⭐</td><td class="tc-g">1–10ms</td><td class="tc-g">&lt;220ms</td><td class="tc-g">15–40ms</td><td class="tc-g">✅ 最优</td></tr>
+  </table>
+</div>
+<div class="lyr lyr-settle" style="margin-top:6px">
+  <div class="lhd">🖥️ V8 最小部署配置</div>
+  <table class="cmp">
+    <tr><th>组件</th><th>规格</th><th>用途</th></tr>
+    <tr><td class="tc-b">US East VPS</td><td>8核/16G/SSD</td><td>策略+Redis+AI推断服务+MCTS池</td></tr>
+    <tr><td class="tc-res">GPU训练服务器</td><td>RTX3090×1</td><td>ResNet+AlphaCast离线训练</td></tr>
+    <tr><td class="tc-o">住宅IP×3–5</td><td>Bright Data</td><td>Poly/Crypto下单出口</td></tr>
+    <tr><td class="tc-y">Windows VPS</td><td>1核/2G</td><td>MT4终端 + DWX EA</td></tr>
+    <tr><td class="tc-r">Redis 7.x</td><td>16G内存</td><td>数据总线+MCTS结果缓存</td></tr>
+  </table>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     PAGE 6 · COMPONENT REFERENCE
+════════════════════════════════════ -->
+<div id="pg-ref" class="pg">
+
+<div class="lyr lyr-src">
+  <div class="lhd">📐 完整组件一览表（V8 融合版）</div>
+  <table class="cmp">
+    <tr><th>文件 / 模块</th><th>层次</th><th>阶段</th><th>核心职责</th><th>状态</th></tr>
+    <tr><td class="tc-res">resnet_encoder.py</td><td>特征融合</td><td class="tc-res">V8</td><td>6残差块 · 128d嵌入 · 多尺度Conv1D</td><td class="tc-res">NEW V8</td></tr>
+    <tr><td class="tc-res">feature_fusion.py</td><td>特征融合</td><td class="tc-res">V8</td><td>注意力门控融合 · Empirical Alpha(50) + ResNet(128) → 178d</td><td class="tc-res">NEW V8</td></tr>
+    <tr><td class="tc-ac">alphacast_model.py</td><td>AI推演</td><td class="tc-ac">V8</td><td>Transformer 6L8H · 多任务头 · 收益/σ/conf/state</td><td class="tc-ac">NEW V8</td></tr>
+    <tr><td class="tc-ac">alphacast_recalib.py</td><td>AI推演</td><td class="tc-ac">V8</td><td>MCTS后二次校准 · 置信度过滤 · 仓位精炼</td><td class="tc-ac">NEW V8</td></tr>
+    <tr><td class="tc-mc">mcts_planner.py</td><td>AI推演</td><td class="tc-mc">V8</td><td>UCB1树搜索 · AlphaCast rollout · Sharpe奖励</td><td class="tc-mc">NEW V8</td></tr>
+    <tr><td class="tc-mc">mcts_worker.py</td><td>AI推演</td><td class="tc-mc">V8</td><td>异步并行任务池 · Redis结果缓存 · 降级模式</td><td class="tc-mc">NEW V8</td></tr>
+    <tr><td class="tc-harn">harness_pipeline.py</td><td>执行层</td><td class="tc-harn">V8</td><td>L5-L7统一编排 · 日志/告警/监控/回测 Wrapper</td><td class="tc-harn">NEW V8</td></tr>
+    <tr><td class="tc-p">market_state_buffer.py</td><td>L2前置</td><td class="tc-b">Phase 1</td><td>循环时序缓冲 · MarketSnapshot</td><td class="tc-g">ORIG</td></tr>
+    <tr><td class="tc-p">feature_engine.py</td><td>L2前置</td><td class="tc-b">Phase 1</td><td>50+ velocity/regime/micro/flow 特征</td><td class="tc-g">ORIG</td></tr>
+    <tr><td class="tc-p">cross_section.py</td><td>L2前置</td><td class="tc-b">Phase 1</td><td>全市场百分位 · cs_composite · cs_tier</td><td class="tc-g">ORIG</td></tr>
+    <tr><td class="tc-g">hard_gating.py</td><td>L3→L4</td><td class="tc-g">Phase 2</td><td>G1–G4 分层门控 · V8: AlphaCast动态调节G3</td><td class="tc-y">UPDATED V8</td></tr>
+    <tr><td class="tc-g">counterfactual_labeler.py</td><td>L3→L4</td><td class="tc-g">Phase 2</td><td>100% 信号记录 · V8: 额外记录AlphaCast+MCTS字段</td><td class="tc-y">UPDATED V8</td></tr>
+    <tr><td class="tc-p">meta_labeler.py</td><td>L4内</td><td class="tc-p">Phase 3</td><td>LightGBM · V8: 输入含AlphaCast.conf+MCTS.value</td><td class="tc-y">UPDATED V8</td></tr>
+    <tr><td class="tc-p">orchestrator_patch.py</td><td>全局</td><td class="tc-p">Phase 2+3</td><td>信号评估串联 · V8: 触发ResNet/AlphaCast在线校准</td><td class="tc-y">UPDATED V8</td></tr>
+    <tr><td class="tc-b">adapters/poly_adapter.py</td><td>L1</td><td>—</td><td>CLOB签名 · 代理出口</td><td>ORIG</td></tr>
+    <tr><td class="tc-b">adapters/crypto_adapter.py</td><td>L1</td><td>—</td><td>资金费率 · 强平监控</td><td>ORIG</td></tr>
+    <tr><td class="tc-b">adapters/equity_adapter.py</td><td>L1</td><td>—</td><td>PDT · T+2 · 期权链</td><td>ORIG</td></tr>
+    <tr><td class="tc-b">adapters/forex_adapter.py</td><td>L1</td><td>—</td><td>手数 · pip · ZMQ桥</td><td>ORIG</td></tr>
+    <tr><td>risk/portfolio_risk.py</td><td>L4</td><td>—</td><td>VaR · Kelly · V8: AlphaCast σ入VaR</td><td class="tc-y">UPDATED V8</td></tr>
+    <tr><td>execution/smart_router.py</td><td>L5</td><td>—</td><td>UnifiedOrder路由 · V8: MCTS最优时机</td><td class="tc-y">UPDATED V8</td></tr>
+  </table>
+</div>
+
+<div class="lyr lyr-p1" style="margin-top:8px">
+  <div class="lhd">🚀 V8 分阶段上线时间表</div>
+  <table class="cmp">
+    <tr><th>阶段</th><th>时间</th><th>关键操作</th><th>验收标准</th><th>回滚方案</th></tr>
+    <tr><td class="tc-b">P1 特征 (原)</td><td>Week 1–2</td><td>BufferRegistry · FeatureEngine · CrossSection</td><td>50+特征 · &lt;5ms · 无内存泄漏</td><td>删除on_ws_snapshot()调用</td></tr>
+    <tr><td class="tc-res">ResNet 接入</td><td>Week 3</td><td>resnet_encoder.py · feature_fusion.py 接入特征流</td><td>178d融合向量稳定 · 嵌入余弦相似&gt;0.85 · &lt;5ms推断</td><td>禁用ResNet · 回退50d纯经验特征</td></tr>
+    <tr><td class="tc-g">P2 门控 (原)</td><td>Week 3–4</td><td>HardGating G1-G3 · CFL标签工厂</td><td>pass_rate 20–50% · 分布合理</td><td>evaluate_signal()直通</td></tr>
+    <tr><td class="tc-ac">AlphaCast 接入</td><td>Week 4–5</td><td>alphacast_model.py · 初次预测接入信号流</td><td>IC&gt;0.05 · conf分布合理 · &lt;10ms</td><td>conf固定0.5 · 回退原始逻辑</td></tr>
+    <tr><td class="tc-mc">MCTS 接入</td><td>Week 5–6</td><td>mcts_planner.py · 异步任务池 · MCTS→校准串联</td><td>路径准确率&gt;55% · 全链路&lt;250ms · 无死锁</td><td>跳过MCTS · AlphaCast直接输出</td></tr>
+    <tr><td class="tc-p">P3 ML激活 (原)</td><td>Week 8+</td><td>n_complete≥5K → MetaLabeler训练 · G4启用</td><td>AUC&gt;0.55 · lift&gt;1.2x · IC&gt;0.05</td><td>is_active=False</td></tr>
+    <tr><td class="tc-harn">Harness 封装</td><td>Week 2+</td><td>harness_pipeline.py 包装L5-L7 · 统一日志/告警/监控</td><td>无功能回归 · 日志结构化 · 告警正常触发</td><td>各子模块独立运行</td></tr>
+  </table>
+</div>
+
+</div>
+
+
+<script>
+function sw(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  const m={full:0,ai:1,alpha:2,pipeline:3,network:4,ref:5};
+  document.querySelectorAll('.tab')[m[id]].classList.add('on');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

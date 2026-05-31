@@ -1,0 +1,46 @@
+# QTS V8 量化交易系统 - 运行时配置
+# 注意：密钥不在此文件中，OKX 密钥从环境变量读取
+
+# 交易对 ID（永续合约）
+inst_id: BTC-USDT-SWAP
+
+# K 线周期（秒），300 = 5 分钟
+bar_seconds: 300
+
+# Redis 连接地址（用于状态持久化，Phase 2）
+redis_url: redis://127.0.0.1:6379/0
+
+# Triton Inference Server 地址（模型推理服务）
+triton_url: localhost:8001
+
+# 日志级别：DEBUG / INFO / WARNING / ERROR
+log_level: INFO
+
+# 模拟运行模式（不触网、不实际下单）
+dry_run: true
+
+# 使用 OKX 模拟盘（demo trading）
+okx_demo: true
+
+# 门控配置（Hard Gating 模块）
+gating:
+  # G1 流动性过滤器
+  min_depth_10: 5.0            # 盘口前 10 档最小深度（基础货币单位）
+  max_spread_bps: 8.0          # 买卖价差超过此值（基点）则拒绝交易
+
+  # G2 波动率过滤器
+  max_realized_vol: 0.04       # 5 分钟已实现波动率上限（过高说明市场剧烈波动）
+  min_realized_vol: 0.00002    # 5 分钟已实现波动率下限（过低说明市场死寂）
+
+  # G3 截面过滤器（Phase 2 启用）
+  cs_min_pct: 0.55             # 截面排名百分位阈值
+
+  # G4 元标签过滤器（Phase 3 启用）
+  meta_min_proba: 0.50         # MetaLabeler 预测概率阈值
+
+  # G5 时间门控 - 资金费率结算黑名单窗口
+  funding_blackout_min: 30     # 资金费率结算前 N 分钟内禁止新开仓（OKX 每 8 小时结算：00/08/16 UTC）
+
+  # AlphaCast 模型置信度阈值
+  min_confidence: 0.55         # 最小置信度（低于此值不触发信号）
+  max_uncertainty: 0.05        # 最大不确定性（高于此值不触发信号）
