@@ -1,0 +1,123 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": { "limit": 100, "matchAny": false, "tags": [], "type": "dashboard" },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "qts_postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_postgres" },
+          "format": "table",
+          "rawSql": "SELECT schema_name, count(*) AS table_count FROM information_schema.tables WHERE table_type = 'BASE TABLE' GROUP BY schema_name ORDER BY table_count DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "PostgreSQL — Table Count by Schema",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT hypertable_name, total_chunks, compression_enabled FROM timescaledb_information.hypertables ORDER BY hypertable_name",
+          "refId": "A"
+        }
+      ],
+      "title": "TimescaleDB — Hypertables",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "qts_clickhouse" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "qts_clickhouse" },
+          "rawSql": "SELECT database, name AS table_name, total_rows, formatReadableSize(total_bytes) AS size FROM system.tables WHERE database = 'qts_hist' AND engine != 'View' ORDER BY total_rows DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "ClickHouse — Table Sizes",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "qts_clickhouse" },
+      "fieldConfig": {
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "qts_clickhouse" },
+          "rawSql": "SELECT event_date, count() AS rows_added FROM system.parts WHERE database = 'qts_hist' AND active = 1 GROUP BY event_date ORDER BY event_date DESC LIMIT 30",
+          "refId": "A"
+        }
+      ],
+      "title": "ClickHouse — Daily Ingestion Volume",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["qts", "v8", "infrastructure"],
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "V8 Infrastructure Overview",
+  "uid": "qts_v8_infra",
+  "version": 1,
+  "weekStart": ""
+}

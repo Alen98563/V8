@@ -197,75 +197,10 @@ services:
       - qts_net
 
   # =============================================================
-  # TODO: App Layer — 待实现
-  # 以下为应用层容器占位，需 Rust/Python 实现后取消注释
+  # Application Layer — see TODO.md for implementation roadmap
+  #   futures_streamer  | prediction_streamer  | evolution_engine
+  #   crypto_streamer   | equity_streamer     | feature_builder  | labeler
   # =============================================================
-
-  # --- 期货行情采集 (yfinance + CFTC COT) ---
-  # futures_streamer:
-  #   build: ../qts_v8_streamers/futures
-  #   container_name: qts_futures_streamer
-  #   depends_on:
-  #     kafka: { condition: service_healthy }
-  #     timescaledb: { condition: service_healthy }
-  #   environment:
-  #     FUTURES_SYMBOLS: "ES,NQ,GC,CL,ZB,NG,SI,ZC,ZS,ZW"
-  #     YFINANCE_PROXY: "${YFINANCE_PROXY:-}"
-  #     CFTC_COT_CRON: "0 18 * * 5"
-  #     KAFKA_BOOTSTRAP: kafka:9092
-  #     TS_HOST: timescaledb
-  #     TS_PORT: 5432
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: json-file
-  #     options: { max-size: "50m", max-file: "3" }
-  #   networks: [qts_net]
-
-  # --- Polymarket 预测市场采集 ---
-  # prediction_streamer:
-  #   build: ../qts_v8_streamers/prediction
-  #   container_name: qts_prediction_streamer
-  #   depends_on:
-  #     kafka: { condition: service_healthy }
-  #     timescaledb: { condition: service_healthy }
-  #   environment:
-  #     POLYMARKET_WS: "wss://ws-subscriptions-clob.polymarket.com/ws"
-  #     POLYMARKET_REST: "https://clob.polymarket.com"
-  #     MAX_ACTIVE_MARKETS: 100
-  #     POLYGON_RPC: "wss://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
-  #     KAFKA_BOOTSTRAP: kafka:9092
-  #     TS_HOST: timescaledb
-  #     TS_PORT: 5432
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: json-file
-  #     options: { max-size: "50m", max-file: "3" }
-  #   networks: [qts_net]
-
-  # --- 策略进化引擎 (ORACLE-FORGE) ---
-  # evolution_engine:
-  #   build: ../qts_v8_strategies/evolution
-  #   container_name: qts_evolution_engine
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
-  #     redis: { condition: service_healthy }
-  #   environment:
-  #     PG_HOST: postgres
-  #     REDIS_HOST: redis
-  #     POPULATION_SIZE: 250
-  #     MAX_GENERATION: 100
-  #     TOURNAMENT_K: 7
-  #     MUTATION_RATE: 0.15
-  #     CROSSOVER_RATE: 0.60
-  #     ELITISM: 30
-  #     PROMOTE_AFTER: 10
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: json-file
-  #     options: { max-size: "50m", max-file: "3" }
-  #   networks: [qts_net]
 
 networks:
   qts_net:

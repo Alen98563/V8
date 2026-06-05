@@ -1,0 +1,192 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100, "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green",  "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "orientation": "auto", "reduceOptions": { "values": false, "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT (streaming_ok_count::float / NULLIF(streaming_ok_count + streaming_error_count, 0) * 100)::int AS health_pct FROM meta.data_health WHERE schema_name = 'crypto_market' ORDER BY checked_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Health — Crypto",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100, "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green",  "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "orientation": "auto", "reduceOptions": { "values": false, "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT (streaming_ok_count::float / NULLIF(streaming_ok_count + streaming_error_count, 0) * 100)::int AS health_pct FROM meta.data_health WHERE schema_name = 'futures' ORDER BY checked_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Health — Futures",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100, "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green",  "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "orientation": "auto", "reduceOptions": { "values": false, "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT (streaming_ok_count::float / NULLIF(streaming_ok_count + streaming_error_count, 0) * 100)::int AS health_pct FROM meta.data_health WHERE schema_name = 'prediction_market' ORDER BY checked_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Health — Prediction",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100, "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "green",  "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "orientation": "auto", "reduceOptions": { "values": false, "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT (streaming_ok_count::float / NULLIF(streaming_ok_count + streaming_error_count, 0) * 100)::int AS health_pct FROM meta.data_health WHERE schema_name = 'multi_market' ORDER BY checked_at DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Health — Multi-Market",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+      "fieldConfig": {
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "calcs": [], "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_timescaledb" },
+          "format": "table",
+          "rawSql": "SELECT checked_at, schema_name, error_type, error_count FROM meta.data_health WHERE streaming_error_count > 0 ORDER BY checked_at DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Quality Errors (Last 100)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "qts_postgres" },
+      "fieldConfig": {
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 6,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "qts_postgres" },
+          "format": "table",
+          "rawSql": "SELECT s.name AS strategy, g.generation, g.fitness_sharpe, g.fitness_sortino, g.fitness_pnl FROM evolution.genomes g JOIN strategy.definitions s ON g.strategy_id = s.id ORDER BY g.fitness_sharpe DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Genomes by Sharpe",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["qts", "v8", "health"],
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "V8 Market Health & Quality",
+  "uid": "qts_v8_health",
+  "version": 1,
+  "weekStart": ""
+}
