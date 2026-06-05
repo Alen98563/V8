@@ -197,9 +197,31 @@ services:
       - qts_net
 
   # =============================================================
+  # Crypto Streamer — OKX/Binance WS → TimescaleDB writer
+  # =============================================================
+  crypto_streamer:
+    build:
+      context: ./services/crypto_streamer
+      dockerfile: Dockerfile
+    container_name: qts_crypto_streamer
+    depends_on:
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      TSDB_DSN: "postgresql://quant:quant2024@timescaledb:5432/qts_market"
+      REDIS_URL: "redis://:quant2024@redis:6379/0"
+      FLUSH_INTERVAL_MS: "200"
+      BATCH_SIZE: "1000"
+    networks:
+      - qts_net
+    restart: unless-stopped
+
+  # =============================================================
   # Application Layer — see TODO.md for implementation roadmap
   #   futures_streamer  | prediction_streamer  | evolution_engine
-  #   crypto_streamer   | equity_streamer     | feature_builder  | labeler
+  #   equity_streamer   | feature_builder      | labeler
   # =============================================================
 
 networks:

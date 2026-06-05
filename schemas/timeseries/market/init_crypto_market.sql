@@ -13,9 +13,8 @@ CREATE SCHEMA IF NOT EXISTS meta;
 -- ██████ 1. 逐笔成交 (Trade Tick) ██████
 -- =============================================================
 CREATE TABLE IF NOT EXISTS crypto.tick (
+    ts          TIMESTAMPTZ     NOT NULL,
     ts_ns       BIGINT          NOT NULL,
-    ts          TIMESTAMPTZ     GENERATED ALWAYS AS
-                (to_timestamp(ts_ns::float8 / 1e9)) STORED,
     ticker      VARCHAR(32)     NOT NULL,
     exchange    VARCHAR(32)     NOT NULL,               -- 'OKX' | 'Binance'
     trade_id    VARCHAR(64)     NOT NULL,
@@ -45,9 +44,8 @@ SELECT add_compression_policy('crypto.tick', INTERVAL '7 days', if_not_exists =>
 -- ██████ 2. 盘口快照 (OrderBook - books5) ██████
 -- =============================================================
 CREATE TABLE IF NOT EXISTS crypto.orderbook (
+    ts      TIMESTAMPTZ     NOT NULL,
     ts_ns   BIGINT          NOT NULL,
-    ts      TIMESTAMPTZ     GENERATED ALWAYS AS
-            (to_timestamp(ts_ns::float8 / 1e9)) STORED,
     ticker  VARCHAR(32)     NOT NULL,
     side    CHAR(4)         NOT NULL,
     level   SMALLINT        NOT NULL,

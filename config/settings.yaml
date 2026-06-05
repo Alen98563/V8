@@ -43,6 +43,23 @@ databases:
     group_id: qts_v8_consumer
     auto_offset_reset: latest
 
+# ────── Crypto Streamer ──────
+crypto_streamer:
+  batch_size: 1000
+  flush_interval_ms: 200
+  pool_min: 2
+  pool_max: 10
+  channels:
+    - crypto:tick
+    - crypto:orderbook
+    - crypto:ohlcv
+    - crypto:funding_rate
+    - crypto:mark_price
+    - crypto:open_interest
+    - crypto:liquidation
+    - crypto:ls_ratio
+    - crypto:regime
+
 # ────── Crypto 交易所 API ──────
 crypto:
   okx:
