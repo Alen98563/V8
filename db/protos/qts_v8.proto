@@ -1,0 +1,420 @@
+// =============================================================
+// QTS V8 · Protobuf 数据契约层 (Enhanced)
+// 统一跨语言数据结构: Rust (prost) / Python (grpcio) / Go
+// 覆盖: Crypto + Multi-Asset (Equity / Options / FX)
+// =============================================================
+
+syntax = "proto3";
+package qts.v8;
+
+// =============================================================
+// 1. 市场快照 (统一所有市场)
+// =============================================================
+message MarketSnapshot {
+  string market      = 1;   // "crypto" | "equity" | "fx" | "options"
+  string ticker      = 2;   // "ETH-USDT-SWAP" | "AAPL" | "EURUSD"
+  int64  ts_ns       = 3;
+  // Price
+  double last        = 4;
+  double bid         = 5;
+  double ask         = 6;
+  double bid_size    = 7;
+  double ask_size    = 8;
+  // Crypto 专属
+  double funding_rate = 9;
+  double mark_px     = 10;
+  double index_px    = 11;
+  double open_interest = 12;
+  // FX 专属
+  double mid         = 13;
+  double spread      = 14;
+  // Options 专属
+  double iv          = 15;
+  double delta       = 16;
+  double gamma       = 17;
+  int64  seq_id      = 18;
+}
+
+// =============================================================
+// 2. 逐笔成交
+// =============================================================
+message Trade {
+  string market     = 1;
+  string ticker     = 2;
+  int64  ts_ns      = 3;
+  string trade_id   = 4;
+  double price      = 5;
+  double size       = 6;
+  string side       = 7;    // "buy" | "sell"
+  string trade_mode = 8;
+  // Equity 专属
+  string exchange   = 9;
+  string conditions = 10;
+  double bid        = 11;
+  double ask        = 12;
+}
+
+// =============================================================
+// 3. 盘口快照
+// =============================================================
+message PriceLevel {
+  double price = 1;
+  double size  = 2;
+  int32  count = 3;
+}
+
+message OrderBook {
+  string market   = 1;
+  string ticker   = 2;
+  int64  ts_ns    = 3;
+  repeated PriceLevel bids = 4;
+  repeated PriceLevel asks = 5;
+  int64  seq_id   = 6;
+  string action   = 7;   // "snapshot" | "update"
+}
+
+// =============================================================
+// 4. K 线 OHLCV
+// =============================================================
+message Candle {
+  string market   = 1;
+  string ticker   = 2;
+  int64  ts_ns    = 3;
+  string bar      = 4;   // "1m" | "5m" | "15m" | "1H" | "4H" | "1D"
+  double open     = 5;
+  double high     = 6;
+  double low      = 7;
+  double close    = 8;
+  double vol      = 9;
+  double vol_ccy  = 10;
+  double vwap     = 11;
+  bool   confirm  = 12;
+}
+
+// =============================================================
+// 5. 加密特征向量 (Crypto 5m, 66 维)
+// =============================================================
+message CryptoFeatureVector {
+  string ticker    = 1;
+  int64  ts_ns     = 2;
+  int64  bar_index = 3;
+  repeated float features = 4;   // 66 维 × 60 步 → flatten
+  int32  window_size = 5;        // 60
+  int32  feat_dim    = 6;        // 66 (单步特征维数)
+  int32  feat_version = 7;
+}
+
+// =============================================================
+// 6. Equity Alpha Factor
+// =============================================================
+message EquityFactor {
+  string symbol    = 1;
+  int64  ts_ns     = 2;
+  string bar       = 3;   // "1d"
+  double mom_1m    = 4;
+  double mom_3m    = 5;
+  double hv_20d    = 6;
+  double pe_ratio  = 7;
+  double pb_ratio  = 8;
+  double rsi_14    = 9;
+  double beta_60d  = 10;
+  double z_mom_1m  = 11;
+  double z_hv_20d  = 12;
+  double z_pe_ratio = 13;
+}
+
+// =============================================================
+// 7. AlphaCast 推断输出
+// =============================================================
+message AlphaCastOutput {
+  string ticker    = 1;
+  int64  ts_ns     = 2;
+  double y_hat     = 3;
+  double sigma     = 4;
+  double conf      = 5;
+  string regime    = 6;
+  double raw_logit = 7;
+  double temp_t    = 8;
+  string model_ver = 9;
+  double elapsed_ms = 10;
+}
+
+// =============================================================
+// 8. MCTS 决策
+// =============================================================
+message MCTSDecision {
+  string ticker       = 1;
+  int64  ts_ns        = 2;
+  string action       = 3;
+  int32  position_level = 4;
+  double path_value   = 5;
+  int32  simulations  = 6;
+  double elapsed_ms   = 7;
+  bool   was_degraded = 8;
+}
+
+// =============================================================
+// 9. CFL 标签
+// =============================================================
+message CFLLabel {
+  string ticker         = 1;
+  int64  bar_open_ts_ns  = 2;
+  int64  bar_close_ts_ns = 3;
+  double ret_1bar        = 4;
+  double ret_3bar        = 5;
+  double ret_5bar        = 6;
+  int32  triple_barrier  = 7;
+  double barrier_up      = 8;
+  double barrier_down    = 9;
+  int32  barrier_timeout = 10;
+  double alphacast_conf  = 11;
+  double alphacast_y_hat = 12;
+  double mcts_value      = 13;
+  string regime          = 14;
+  int64  realized_ts_ns  = 15;
+  bool   is_finalized    = 16;
+}
+
+// =============================================================
+// 10. 订单
+// =============================================================
+message Order {
+  string ord_id     = 1;
+  string cl_ord_id  = 2;
+  string market     = 3;
+  string ticker     = 4;
+  int64  ts_ns      = 5;
+  string side       = 6;
+  string ord_type   = 7;
+  double px         = 8;
+  double sz         = 9;
+  double fill_px    = 10;
+  double fill_sz    = 11;
+  string state      = 12;
+  string strategy_id = 13;
+  double conf       = 14;
+  double mcts_val   = 15;
+}
+
+// =============================================================
+// 11. 门控状态
+// =============================================================
+message GateStatus {
+  string ticker     = 1;
+  int64  ts_ns      = 2;
+  bool   g1_pass    = 3;
+  string g1_reason  = 4;
+  bool   g2_pass    = 5;
+  string g2_regime  = 6;
+  bool   g3_pass    = 7;
+  double g3_conf    = 8;
+  double g3_threshold = 9;
+  bool   g4_pass    = 10;
+  bool   g4_active  = 11;
+  int32  g4_label_cnt = 12;
+  bool   g5_pass    = 13;
+  double g5_mins_to_settle = 14;
+  bool   final_pass = 15;
+}
+
+// =============================================================
+// 12. 风控告警
+// =============================================================
+message RiskAlert {
+  string severity   = 1;   // "INFO" | "WARN" | "ERROR" | "CRITICAL"
+  string alert_type = 2;
+  string ticker     = 3;
+  double value      = 4;
+  double threshold  = 5;
+  string message    = 6;
+  int64  ts_ns      = 7;
+}
+
+// =============================================================
+// 13. 系统健康
+// =============================================================
+message SystemHealth {
+  string ws_status       = 1;
+  double ws_lag_ms       = 2;
+  string rest_status     = 3;
+  string feature_engine  = 4;
+  int64  last_feat_bar   = 5;
+  string triton_status   = 6;
+  double triton_latency  = 7;
+  string mcts_status     = 8;
+  double db_write_lag_ms = 9;
+  int64  cfl_label_count = 10;
+  double daily_pnl_usdt  = 11;
+  int32  daily_trade_cnt = 12;
+  int32  phase           = 13;
+}
+
+// =============================================================
+// 14. Prediction Market Tick
+// =============================================================
+message PredictionTick {
+  string token_id      = 1;
+  string market_id     = 2;   // condition_id
+  string slug          = 3;
+  string trade_id      = 4;
+  double price         = 5;
+  double size          = 6;
+  double notional      = 7;
+  string side          = 8;   // "BUY" | "SELL"
+  string outcome       = 9;   // "YES" | "NO"
+  double yes_price     = 10;
+  double no_price      = 11;
+  double parity_dev    = 12;  // yes_price + no_price - 1.0
+  string tx_hash       = 13;
+  int64  ts_ns         = 14;
+}
+
+// =============================================================
+// 15. Prediction OrderBook
+// =============================================================
+message PredictionOB {
+  string market_id     = 1;
+  string token_id      = 2;
+  string outcome       = 3;   // "YES" | "NO"
+  string side          = 4;   // "bid" | "ask"
+  int32  level         = 5;
+  double price         = 6;
+  double size          = 7;
+  double best_bid      = 8;
+  double best_ask      = 9;
+  double mid           = 10;
+  double spread        = 11;
+  double obi           = 12;
+  int64  ts_ns         = 13;
+}
+
+// =============================================================
+// 16. Parity Arbitrage Signal
+// =============================================================
+message ParityArb {
+  string market_id     = 1;
+  string slug          = 2;
+  double yes_price     = 3;
+  double no_price      = 4;
+  double parity        = 5;   // yes + no - 1
+  double abs_parity    = 6;
+  string arb_signal    = 7;   // "buy_yes_sell_no" | "buy_no_sell_yes" | "none"
+  double arb_spread    = 8;
+  double net_profit    = 9;
+  bool   executed      = 10;
+  double pnl           = 11;
+  int64  ts_ns         = 12;
+}
+
+// =============================================================
+// 17. Market Resolution
+// =============================================================
+message Resolution {
+  string market_id     = 1;
+  string slug          = 2;
+  string question      = 3;
+  string outcome       = 4;   // "YES" | "NO" | "INVALID"
+  double yes_payout    = 5;
+  double no_payout     = 6;
+  bool   disputed      = 7;
+  int32  dispute_rounds = 8;
+  int64  resolved_ns   = 9;
+}
+
+// =============================================================
+// 18. Genome (Genetic Programming Individual)
+// =============================================================
+message Genome {
+  string gene_id       = 1;
+  string strategy_name = 2;
+  string version       = 3;
+  string parent_gene_id = 4;
+  string market        = 5;
+  string category      = 6;
+  string status        = 7;   // "sandbox" | "arena" | "promoted" | "retired"
+  // GP trees
+  string entry_tree    = 8;
+  string exit_tree     = 9;
+  double stop_loss     = 10;
+  double take_profit   = 11;
+  double position_pct  = 12;
+  // Performance
+  double fitness_score = 13;
+  double sharpe_ratio  = 14;
+  double stability     = 15;
+  double win_rate      = 16;
+  double max_drawdown  = 17;
+  double total_pnl     = 18;
+  int32  total_trades  = 19;
+  // Mutation
+  string mutation_type = 20;
+  string changes_json  = 21;
+  int64  created_ns    = 22;
+}
+
+// =============================================================
+// 19. Cross-Section Rank
+// =============================================================
+message CrossSection {
+  string market        = 1;
+  string ticker        = 2;
+  double cs_composite  = 3;
+  int32  cs_tier       = 4;
+  int32  n_markets     = 5;
+  map<string, double> ranks = 6;
+  int64  ts_ns         = 7;
+}
+
+// =============================================================
+// 20-22. Futures Market Messages
+// =============================================================
+message FuturesTick {
+  string symbol          = 1;
+  string contract_month  = 2;
+  string expiry           = 3;
+  double bid             = 4;
+  double ask             = 5;
+  double last            = 6;
+  int32  volume          = 7;
+  int32  open_interest   = 8;
+  double settlement      = 9;
+  double tick_size       = 10;
+  double tick_value      = 11;
+  string session         = 12;
+  string source          = 13;
+  int64  ts_ns           = 14;
+}
+
+message FuturesTermStructure {
+  string symbol          = 1;
+  string contract_month  = 2;
+  string expiry           = 3;
+  int32  dte             = 4;
+  double price           = 5;
+  double spot_price      = 6;
+  double basis           = 7;
+  double basis_pct       = 8;
+  double roll_spread     = 9;
+  string regime          = 10;
+  int32  open_interest   = 11;
+  int32  volume          = 12;
+  int64  ts_ns           = 13;
+}
+
+message FuturesCOT {
+  string report_date     = 1;
+  string symbol          = 2;
+  string exchange        = 3;
+  string contract_name   = 4;
+  int32  comm_long       = 5;
+  int32  comm_short      = 6;
+  int32  managed_long    = 7;
+  int32  managed_short   = 8;
+  int32  nonrep_long     = 9;
+  int32  nonrep_short    = 10;
+  int32  net_spec_pos    = 11;
+  double spec_long_pct   = 12;
+  double spec_short_pct  = 13;
+  double cot_index       = 14;
+  int32  oi_total        = 15;
+}

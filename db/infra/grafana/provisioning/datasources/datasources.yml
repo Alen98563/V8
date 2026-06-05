@@ -1,0 +1,51 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL (qts_ops)
+    type: postgres
+    uid: qts_postgres
+    url: postgres:5432
+    database: qts_ops
+    user: quant
+    secureJsonData:
+      password: quant2024
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    editable: true
+
+  - name: TimescaleDB (qts_market)
+    type: postgres
+    uid: qts_timescaledb
+    url: timescaledb:5432
+    database: qts_market
+    user: quant
+    secureJsonData:
+      password: quant2024
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
+    editable: true
+
+  - name: ClickHouse (qts_hist)
+    type: grafana-clickhouse-datasource
+    uid: qts_clickhouse
+    url: http://clickhouse:8123
+    jsonData:
+      username: quant
+      defaultDatabase: qts_hist
+    secureJsonData:
+      password: quant2024
+    editable: true
+
+  - name: Redis
+    type: redis-datasource
+    uid: qts_redis
+    url: redis://redis:6379
+    jsonData:
+      password: quant2024
+      poolSize: 5
+      timeout: 10
+    editable: true

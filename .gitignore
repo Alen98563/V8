@@ -45,3 +45,10 @@ credentials.json
 # Compiled proto
 schemas/*_pb2.py
 schemas/*.pyi
+# SQLite runtime
+*.db-shm
+*.db-wal
+
+# Runtime artifacts
+*.pid
+.cross_section.pid
