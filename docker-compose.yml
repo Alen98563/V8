@@ -1,0 +1,281 @@
+version: "3.9"
+
+services:
+  # =============================================================
+  # PostgreSQL 16 — 策略/账户/风控/模型校准
+  # =============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: qts_postgres
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant2024
+      POSTGRES_DB: qts_ops
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./schemas/relational:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant -d qts_ops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qts_net
+
+  # =============================================================
+  # TimescaleDB 2.16 — 实时行情 & 特征 & CFL 标签
+  # =============================================================
+  timescaledb:
+    image: timescale/timescaledb:2.16.1-pg16
+    container_name: qts_timescaledb
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant2024
+      POSTGRES_DB: qts_market
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - ts_data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=4GB"
+      - "-c"
+      - "effective_cache_size=12GB"
+      - "-c"
+      - "work_mem=256MB"
+      - "-c"
+      - "max_connections=200"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant -d qts_market"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qts_net
+
+  # =============================================================
+  # ClickHouse 24.8 — 历史分析
+  # =============================================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: qts_clickhouse
+    environment:
+      CLICKHOUSE_USER: quant
+      CLICKHOUSE_PASSWORD: quant2024
+      CLICKHOUSE_DB: qts_hist
+    ports:
+      - "8123:8123"   # HTTP
+      - "9000:9000"   # Native
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user quant --password quant2024 --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qts_net
+
+  # =============================================================
+  # Redis 7.2 — 热缓存
+  # =============================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: qts_redis
+    command: >
+      redis-server
+      --requirepass quant2024
+      --maxmemory 4gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "quant2024", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - qts_net
+
+  # =============================================================
+  # Kafka — 消息解耦 & 缓冲
+  # =============================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: qts_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - qts_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: qts_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - qts_net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: qts_kafka_ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: qts_v8
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - qts_net
+
+  # =============================================================
+  # Grafana 10.4 — 监控看板
+  # =============================================================
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: qts_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: quant2024
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - qts_net
+
+  # =============================================================
+  # MinIO — S3 对象存储 (Parquet 归档)
+  # =============================================================
+  minio:
+    image: minio/minio:RELEASE.2024-05-10T14-38-25Z
+    container_name: qts_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: quant
+      MINIO_ROOT_PASSWORD: quant2024
+    ports:
+      - "9001:9001"  # Console
+      - "9100:9000"  # API
+    volumes:
+      - minio_data:/data
+    networks:
+      - qts_net
+
+  # =============================================================
+  # TODO: App Layer — 待实现
+  # 以下为应用层容器占位，需 Rust/Python 实现后取消注释
+  # =============================================================
+
+  # --- 期货行情采集 (yfinance + CFTC COT) ---
+  # futures_streamer:
+  #   build: ../qts_v8_streamers/futures
+  #   container_name: qts_futures_streamer
+  #   depends_on:
+  #     kafka: { condition: service_healthy }
+  #     timescaledb: { condition: service_healthy }
+  #   environment:
+  #     FUTURES_SYMBOLS: "ES,NQ,GC,CL,ZB,NG,SI,ZC,ZS,ZW"
+  #     YFINANCE_PROXY: "${YFINANCE_PROXY:-}"
+  #     CFTC_COT_CRON: "0 18 * * 5"
+  #     KAFKA_BOOTSTRAP: kafka:9092
+  #     TS_HOST: timescaledb
+  #     TS_PORT: 5432
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #     options: { max-size: "50m", max-file: "3" }
+  #   networks: [qts_net]
+
+  # --- Polymarket 预测市场采集 ---
+  # prediction_streamer:
+  #   build: ../qts_v8_streamers/prediction
+  #   container_name: qts_prediction_streamer
+  #   depends_on:
+  #     kafka: { condition: service_healthy }
+  #     timescaledb: { condition: service_healthy }
+  #   environment:
+  #     POLYMARKET_WS: "wss://ws-subscriptions-clob.polymarket.com/ws"
+  #     POLYMARKET_REST: "https://clob.polymarket.com"
+  #     MAX_ACTIVE_MARKETS: 100
+  #     POLYGON_RPC: "wss://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+  #     KAFKA_BOOTSTRAP: kafka:9092
+  #     TS_HOST: timescaledb
+  #     TS_PORT: 5432
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #     options: { max-size: "50m", max-file: "3" }
+  #   networks: [qts_net]
+
+  # --- 策略进化引擎 (ORACLE-FORGE) ---
+  # evolution_engine:
+  #   build: ../qts_v8_strategies/evolution
+  #   container_name: qts_evolution_engine
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     redis: { condition: service_healthy }
+  #   environment:
+  #     PG_HOST: postgres
+  #     REDIS_HOST: redis
+  #     POPULATION_SIZE: 250
+  #     MAX_GENERATION: 100
+  #     TOURNAMENT_K: 7
+  #     MUTATION_RATE: 0.15
+  #     CROSSOVER_RATE: 0.60
+  #     ELITISM: 30
+  #     PROMOTE_AFTER: 10
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #     options: { max-size: "50m", max-file: "3" }
+  #   networks: [qts_net]
+
+networks:
+  qts_net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  ts_data:
+  ch_data:
+  ch_logs:
+  redis_data:
+  grafana_data:
+  minio_data:
