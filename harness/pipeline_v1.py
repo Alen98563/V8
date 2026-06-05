@@ -1,5 +1,5 @@
 """
-harness/pipeline_v1.py �?Task 6: 无功能回归包装器 (Harness)
+harness/pipeline_v1.py —Task 6: 无功能回归包装器 (Harness)
 =========================================================
 
 A zero-behaviour-change wrapper that threads a global ``trace_id`` through every
@@ -75,7 +75,7 @@ class Harness:
             )
 
     def wrap(self, stage: str) -> Callable:
-        """Decorator form of stage() �?functional no-op wrapper."""
+        """Decorator form of stage() —functional no-op wrapper."""
 
         def _deco(fn: Callable) -> Callable:
             @functools.wraps(fn)

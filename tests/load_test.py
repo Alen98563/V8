@@ -1,10 +1,10 @@
 """
-tests/load_test.py �?P5: 500 TPS 压力测试
+tests/load_test.py —P5: 500 TPS 压力测试
 ===========================================
 
-验证 V8 系统�?500 ticks/second 负载下的性能�?
-    测试�?
-    1. WebSocket 消息吞吐 (模拟 500 TPS tick 推�?
+验证 V8 系统�?500 ticks/second 负载下的性能�?
+    测试�?
+    1. WebSocket 消息吞吐 (模拟 500 TPS tick 推�?
     2. FeatureEngine 特征计算延迟
     3. MCTS Worker 并发搜索
     4. Gating 门控评估
@@ -12,10 +12,10 @@ tests/load_test.py �?P5: 500 TPS 压力测试
     6. 全链路端到端延迟
 
     指标:
-    - 吞吐�?(actual TPS)
-    - 各阶�?p50 / p95 / p99 延迟
+    - 吞吐�?(actual TPS)
+    - 各阶�?p50 / p95 / p99 延迟
     - 内存占用
-    - CPU 使用�?    - 错误�?
+    - CPU 使用�?    - 错误�?
 用法:
     python tests/load_test.py --tps 500 --duration 60
     python tests/load_test.py --tps 100 --duration 30 --stages mcts,gating
@@ -60,7 +60,7 @@ class LoadTestConfig:
 
 @dataclass
 class StageResult:
-    """单阶段压测结�?""
+    """单阶段压测结�?""
     stage: str
     total_ops: int = 0
     errors: int = 0
@@ -79,10 +79,10 @@ class StageResult:
 
 
 # ============================================================
-# 延迟采样�?# ============================================================
+# 延迟采样�?# ============================================================
 
 class LatencySampler:
-    """高效延迟采样 (固定缓冲�?"""
+    """高效延迟采样 (固定缓冲�?"""
 
     def __init__(self, max_samples: int = 100000):
         self._samples: List[float] = []
@@ -298,7 +298,7 @@ def bench_execution(cfg: LoadTestConfig) -> StageResult:
             }
             fsm = OrderFSM(cl_ord_id, cfg.inst_id, new_trace_id("lt"))
             t0 = time.perf_counter()
-            # dry-run path �?sync 的，但方法是 async def
+            # dry-run path �?sync 的，但方法是 async def
             # 直接调用内部 sync 逻辑
             receipt = {
                 "code": "0",
@@ -320,7 +320,7 @@ def bench_execution(cfg: LoadTestConfig) -> StageResult:
 
 
 def bench_full_pipeline(cfg: LoadTestConfig) -> StageResult:
-    """压测全链�?(PipelineV2)"""
+    """压测全链�?(PipelineV2)"""
     from harness.pipeline_v2 import PipelineV2
 
     pipe = PipelineV2(mcts_force_fallback=True)
@@ -352,7 +352,7 @@ def bench_full_pipeline(cfg: LoadTestConfig) -> StageResult:
 
 
 # ============================================================
-# 主函�?# ============================================================
+# 主函�?# ============================================================
 
 BENCHMARKS = {
     "features": bench_features,
@@ -396,7 +396,7 @@ def run_load_test(cfg: LoadTestConfig) -> Dict[str, Any]:
             _log.error(f"  {stage} FAILED: {e}")
             results[stage] = StageResult(stage=stage, errors=-1)
 
-    # 汇�?    summary = {
+    # 汇�?    summary = {
         "config": {
             "target_tps": cfg.target_tps,
             "duration_sec": cfg.duration_sec,
@@ -410,7 +410,7 @@ def run_load_test(cfg: LoadTestConfig) -> Dict[str, Any]:
         ),
     }
 
-    # full_pipeline 单独评估 (不要求达�?500 TPS)
+    # full_pipeline 单独评估 (不要求达�?500 TPS)
     if "full_pipeline" in results:
         fp = results["full_pipeline"]
         summary["pipeline_pass"] = fp.p99_ms < 500 and fp.error_rate < 0.01

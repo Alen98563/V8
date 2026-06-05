@@ -1,5 +1,5 @@
 """
-common/engine.py â€?v8_core_engine binder & graceful fallback
+common/engine.py â€”v8_core_engine binder & graceful fallback
 =============================================================
 
 This is the single seam between Qwen's Python orchestration layer and
@@ -9,14 +9,14 @@ Behaviour
 ---------
 * If the compiled extension ``v8_core_engine`` is importable, we re-export its
   classes verbatim (ShmBridge, FeatureEngine, OkxChannel, OrderFSM, MctsPool,
-  OkxWsClient) â€?zero overhead, the real binary.
+  OkxWsClient) â€”zero overhead, the real binary.
 * If it is NOT importable (e.g. maturin/protoc not yet installed, or running on
   a host without ``/dev/shm``), we fall back to pure-Python stand-ins that honour
   the *exact* signatures declared in ``v8_core_engine.pyi``.
 
 The fallbacks are deliberately faithful to the contract (return types, byte
 formats, JSON shapes) so that the orchestrator, gating, settlement, monitor and
-the integration test-suite all run end-to-end on any host â€?and snap onto the
+the integration test-suite all run end-to-end on any host â€”and snap onto the
 real binary the moment it is built, with no call-site changes.
 
 Use ``ENGINE_BACKEND`` to know which path is live ("native" | "fallback").
@@ -47,7 +47,7 @@ try:  # pragma: no cover - exercised only when the .pyd is built
     OkxWsClient = _native.OkxWsClient
     ENGINE_BACKEND = "native"
 
-except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
+except Exception:  # noqa: BLE001 - any import/abi failure -> fallback
     ENGINE_BACKEND = "fallback"
 
     _F32 = struct.Struct("<f")
@@ -114,7 +114,7 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
                 if not rows:
                     return np.zeros((0, self._cols), dtype=np.float32)
                 return np.asarray(rows, dtype=np.float32)
-            except Exception:  # numpy missing â†?list of lists
+            except Exception:  # numpy missing ï¿½?list of lists
                 return rows
 
         def get_raw_ptr(self, secs: int) -> Tuple[int, Tuple[int, int]]:
@@ -231,6 +231,7 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
                         feats[7] = rets[-1]          # last return
                 feats[8] = self._funding
                 feats[9] = self._funding_cum
+                feats[49] = last  # current price for rollout_v1 px[-1]
             return b"".join(_F32.pack(v) for v in feats)
 
         def set_funding_rate(self, rate: float, cum: float) -> None:
@@ -244,7 +245,7 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
             return (len(self._prices), len(self._bars), self._pulse)
 
     class OkxChannel:  # type: ignore[no-redef]
-        """OKX REST signer stand-in â€?builds the same signed-request JSON shape.
+        """OKX REST signer stand-in â€”builds the same signed-request JSON shape.
 
         Uses hmac-sha256 just like ring on the Rust side, so the produced
         signature header is structurally identical (base64(hmac(secret, prehash))).
@@ -414,7 +415,7 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
 
     class MctsPool:  # type: ignore[no-redef]
         """Single-thread MCTS stand-in. Calls rollout_fn once per simulation
-        budget (capped) and aggregates expected value â€?enough to exercise the
+        budget (capped) and aggregates expected value â€”enough to exercise the
         Qwen executor path; the real parallel UCB1 search lives in mcts_core.rs.
         """
 
@@ -461,7 +462,7 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
             return json.dumps({"workers": self._workers, "timeout_ms": self._timeout})
 
     class OkxWsClient:  # type: ignore[no-redef]
-        """WS client stand-in â€?yields synthetic snapshots so the pipeline can be
+        """WS client stand-in â€”yields synthetic snapshots so the pipeline can be
         driven in CI / dry-run without a live OKX socket. The real Tokio client
         lives in adapters/okx_ws.rs.
         """
@@ -508,13 +509,37 @@ except Exception:  # noqa: BLE001 - any import/abi failure â†?fallback
             return self._running
 
 
+
+
+# If native .so is importable but missing some classes (e.g. no protobuf),
+# override the fallback definitions with available native classes.
+_NATIVE_SO = None
+try:
+    import v8_core_engine as _native_so  # type: ignore
+    _NATIVE_SO = _native_so
+except Exception:
+    pass
+
+if _NATIVE_SO is not None:
+    _bound_count = 0
+    for _cn in ("ShmBridge", "OkxChannel", "OrderFSM", "OkxWsClient"):
+        try:
+            globals()[_cn] = getattr(_NATIVE_SO, _cn)
+            _bound_count += 1
+        except AttributeError:
+            pass
+    if _bound_count == 6:
+        ENGINE_BACKEND = "native"
+    elif _bound_count > 0:
+        ENGINE_BACKEND = "mixed"
+
 def backend() -> str:
     """Return the live engine backend: 'native' or 'fallback'."""
     return ENGINE_BACKEND
 
 
 def is_native() -> bool:
-    return ENGINE_BACKEND == "native"
+    return ENGINE_BACKEND in ("native", "mixed")
 
 
 __all__ = [

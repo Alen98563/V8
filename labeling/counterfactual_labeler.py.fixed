@@ -1,0 +1,312 @@
+"""
+labeling/counterfactual_labeler.py Task 2: CFL 反事实标签工================================================================
+
+反事实标(Counterfactual Labels, CFL) 解决量化交易中最核心的标注问题：
+"如果当时没有开仓，后续行情到底能不能赚到钱
+
+标准做法用未来收益做标签，但 97.4% tick 5m 窗口内收< 手续费，
+导致模型被多数类无利可图"）淹没。CFL 通过 **反事实模* 生成信息密集的标签：
+
+    label = sign(PnL_simulated - cost) × confidence_weight
+
+标签分布    -1: 反事实亏(扣除手续费后亏钱)
+     0: 中(收益 < 阈值，不值得交易)
+    +1: 反事实盈(扣除手续费后赚钱)
+
+产出AlphaCast MetaLabeler 训练使用
+接口契约    - 输入：polars DataFrame，必须包含列 [ts_ms, inst_id, last_px, bid1, ask1,
+              bid1_sz, ask1_sz, features_50d]
+    - 输出：CFLLabel 列表 polars DataFrame（附label / weight 列）
+    - 可序列化：to_parquet / from_parquet 支持离线训练管线
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from common.logging_setup import get_logger, get_trace
+
+_log = get_logger("labeling.cfl")
+
+# 尝试导入 polars（lazy，不强制依赖)
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # type: ignore
+
+
+# ============================================================
+# 数据结构
+# ============================================================
+
+@dataclass
+class CFLLabel:
+    """单条反事实标"""
+    ts_ms: int
+    inst_id: str
+    label: int            # -1 / 0 / +1
+    pnl_net: float        # 扣除手续费后的反事实 PnL (bps)
+    pnl_gross: float      # 毛收(bps)
+    cost_bps: float       # 手续(bps)
+    max_adverse_excursion: float   # 最大回(bps)
+    max_favorable_excursion: float # 最大顺向波(bps)
+    confidence_weight: float       # 样本权重 [0, 1]
+    horizon_bars: int     # 回望窗口 (bar 
+    features_hash: str = ""        # 特征快照指纹 (去重
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class CFLConfig:
+    """FL 超参数"""
+    # 回望窗口
+    horizon_bars: int = 12           # 5m × 12 = 1 小时回望
+    # 手续    taker_fee_bps: float = 5.0       # OKX taker 费率 0.05% = 5 bps
+    maker_fee_bps: float = 2.0       # OKX maker 费率 0.02% = 2 bps
+    use_taker: bool = True           # 保守假设 taker 成交
+    # 标签阈    profit_threshold_bps: float = 3.0   # 净利润 > 3bps 才标 +1
+    loss_threshold_bps: float = 1.0     # 净亏损 > 1bps -1 (更敏
+    # 样本权重
+    min_weight: float = 0.1
+    max_weight: float = 1.0
+    # 信号强度加权
+    use_excursion_weight: bool = True   # MFE/MAE 幅度加权
+    # 去重
+    dedup_hash_window: int = 60         # 60 bar 内特征相似则去重
+
+
+# ============================================================
+# 核心引擎
+# ============================================================
+
+class CounterfactualLabeler:
+    """
+    反事实标签工
+    用法        labeler = CounterfactualLabeler()
+        labels = labeler.label_dataframe(df)
+        # 或逐窗口：
+        label = labeler.label_window(entry_px, future_bars)
+    """
+
+    def __init__(self, cfg: Optional[CFLConfig] = None) -> None:
+        self.cfg = cfg or CFLConfig()
+        self._cost_bps = self.cfg.taker_fee_bps if self.cfg.use_taker else self.cfg.maker_fee_bps
+        # 双边成本 (开 + 
+        self._round_trip_cost = self._cost_bps * 2
+        self._label_count = 0
+        self._pos_count = 0
+        self._neg_count = 0
+        self._neutral_count = 0
+
+    def label_window(
+        self,
+        entry_px: float,
+        future_prices: Sequence[float],
+        ts_ms: int = 0,
+        inst_id: str = "BTC-USDT-SWAP",
+    ) -> CFLLabel:
+        """
+        对一个时间窗口做反事实模拟：
+
+        假设entry_px 开1 单位，在 horizon 内寻找最优平仓点        计算扣除手续费后的净收益，据此生成标签
+        Args:
+            entry_px: 开仓价            future_prices: 未来 N bar 的收盘价序列
+            ts_ms: 时间            inst_id: 合约 ID
+
+        Returns:
+            CFLLabel
+        """
+        if not future_prices or entry_px <= 0:
+            return CFLLabel(
+                ts_ms=ts_ms, inst_id=inst_id, label=0,
+                pnl_net=0.0, pnl_gross=0.0, cost_bps=self._round_trip_cost,
+                max_adverse_excursion=0.0, max_favorable_excursion=0.0,
+                confidence_weight=self.cfg.min_weight,
+                horizon_bars=len(future_prices) if future_prices else 0,
+            )
+
+        # 计算每根 bar 的收(bps)
+        returns_bps = [(px / entry_px - 1.0) * 10000.0 for px in future_prices]
+
+        # 最大顺向波(MFE) = 最佳平仓点收益
+        mfe = max(returns_bps) if returns_bps else 0.0
+        # 最大回(MAE) = 最差时刻亏        mae = min(returns_bps) if returns_bps else 0.0
+
+        # 反事PnL：假设在 MFE 点平(最优情
+        pnl_gross = mfe
+        pnl_net = pnl_gross - self._round_trip_cost
+
+        # 标签判定
+        if pnl_net > self.cfg.profit_threshold_bps:
+            label = 1
+        elif pnl_net < -self.cfg.loss_threshold_bps:
+            label = -1
+        else:
+            label = 0
+
+        # 样本权重：MFE MAE 幅度越大，信号越强，权重越高
+        if self.cfg.use_excursion_weight:
+            excursion_range = abs(mfe - mae)
+            # sigmoid 归一化到 [min_weight, max_weight]
+            raw_w = 1.0 / (1.0 + max(0.0, 20.0 - excursion_range) * 0.1)
+            weight = self.cfg.min_weight + (self.cfg.max_weight - self.cfg.min_weight) * raw_w
+        else:
+            weight = self.cfg.max_weight if label != 0 else self.cfg.min_weight
+
+        self._label_count += 1
+        if label == 1:
+            self._pos_count += 1
+        elif label == -1:
+            self._neg_count += 1
+        else:
+            self._neutral_count += 1
+
+        return CFLLabel(
+            ts_ms=ts_ms,
+            inst_id=inst_id,
+            label=label,
+            pnl_net=round(pnl_net, 4),
+            pnl_gross=round(pnl_gross, 4),
+            cost_bps=self._round_trip_cost,
+            max_adverse_excursion=round(mae, 4),
+            max_favorable_excursion=round(mfe, 4),
+            confidence_weight=round(weight, 4),
+            horizon_bars=len(future_prices),
+        )
+
+    def label_dataframe(self, df: Any) -> Any:
+        """
+        polars DataFrame 批量生成 CFL 标签
+
+        输入 df 必须包含 ts_ms, inst_id, last_px
+        按时间排序后，对每行取未horizon_bars bar 做反事实模拟
+
+        Returns: polars DataFrame，附label / pnl_net / weight         """
+        if pl is None:
+            raise ImportError("polars required for label_dataframe; pip install polars")
+
+        horizon = self.cfg.horizon_bars
+        n = len(df)
+        labels = []
+        pnl_nets = []
+        weights = []
+        maes = []
+        mfes = []
+
+        prices = df["last_px"].to_list()
+
+        for i in range(n):
+            entry_px = prices[i]
+            future_end = min(i + horizon + 1, n)
+            future_prices = prices[i + 1:future_end] if i + 1 < n else []
+
+            lbl = self.label_window(
+                entry_px=entry_px,
+                future_prices=future_prices,
+                ts_ms=int(df["ts_ms"][i]) if "ts_ms" in df.columns else 0,
+                inst_id=str(df["inst_id"][i]) if "inst_id" in df.columns else "BTC-USDT-SWAP",
+            )
+            labels.append(lbl.label)
+            pnl_nets.append(lbl.pnl_net)
+            weights.append(lbl.confidence_weight)
+            maes.append(lbl.max_adverse_excursion)
+            mfes.append(lbl.max_favorable_excursion)
+
+        result = df.with_columns([
+            pl.Series("cfl_label", labels),
+            pl.Series("cfl_pnl_net", pnl_nets),
+            pl.Series("cfl_weight", weights),
+            pl.Series("cfl_mae", maes),
+            pl.Series("cfl_mfe", mfes),
+        ])
+
+        _log.info(
+            "cfl_labeling_done",
+            extra={
+                "total": self._label_count,
+                "pos": self._pos_count,
+                "neg": self._neg_count,
+                "neutral": self._neutral_count,
+                "pos_pct": round(self._pos_count / max(self._label_count, 1) * 100, 1),
+                "neg_pct": round(self._neg_count / max(self._label_count, 1) * 100, 1),
+                "trace_id": get_trace(),
+            },
+        )
+
+        return result
+
+    def stats(self) -> Dict[str, Any]:
+        """返回当前标签统计"""
+        total = max(self._label_count, 1)
+        return {
+            "total_labels": self._label_count,
+            "positive": self._pos_count,
+            "negative": self._neg_count,
+            "neutral": self._neutral_count,
+            "pos_pct": round(self._pos_count / total * 100, 2),
+            "neg_pct": round(self._neg_count / total * 100, 2),
+            "neutral_pct": round(self._neutral_count / total * 100, 2),
+            "round_trip_cost_bps": self._round_trip_cost,
+            "horizon_bars": self.cfg.horizon_bars,
+        }
+
+    def reset_stats(self) -> None:
+        self._label_count = 0
+        self._pos_count = 0
+        self._neg_count = 0
+        self._neutral_count = 0
+
+
+# ============================================================
+# 序列# ============================================================
+
+def labels_to_parquet(labels: List[CFLLabel], path: str) -> None:
+    """CFL 标签列表保存Parquet"""
+    if pl is None:
+        raise ImportError("polars required for labels_to_parquet")
+    rows = [lbl.as_dict() for lbl in labels]
+    df = pl.DataFrame(rows)
+    df.write_parquet(path)
+    _log.info("cfl_saved", extra={"path": path, "count": len(labels)})
+
+
+def labels_from_parquet(path: str) -> List[CFLLabel]:
+    """Parquet 加载 CFL 标签"""
+    if pl is None:
+        raise ImportError("polars required for labels_from_parquet")
+    df = pl.read_parquet(path)
+    return [CFLLabel(**row) for row in df.to_dicts()]
+
+
+# ============================================================
+# 自测
+# ============================================================
+
+if __name__ == "__main__":
+    labeler = CounterfactualLabeler()
+
+    # 模拟测试：ETH 3000 开始的未来 12 5m bar
+    prices_flat = [3000 + i * 2 for i in range(6)] + [3012 - i * 3 for i in range(6)]
+    lbl = labeler.label_window(3000.0, prices_flat)
+    print(f"Label: {lbl.label}, PnL net: {lbl.pnl_net} bps, weight: {lbl.confidence_weight}")
+    print(f"  MFE: {lbl.max_favorable_excursion} bps, MAE: {lbl.max_adverse_excursion} bps")
+
+    # 统计
+    for scenario, px_seq in [
+        ("strong_up", [3000 + i * 5 for i in range(12)]),
+        ("flat", [3000.0] * 12),
+        ("strong_down", [3000 - i * 5 for i in range(12)]),
+        ("v_shape", [3000 - i * 3 for i in range(6)] + [2985 + i * 6 for i in range(6)]),
+    ]:
+        labeler.reset_stats()
+        lbl = labeler.label_window(3000.0, px_seq)
+        print(f"  {scenario}: label={lbl.label}, pnl_net={lbl.pnl_net}bps")
+
+    print(f"\nStats: {labeler.stats()}")
+    print("CounterfactualLabeler self-test passed")

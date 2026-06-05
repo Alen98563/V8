@@ -1,0 +1,11 @@
+{
+  "trained_at": "2026-06-01T13:08:41.133950+00:00",
+  "arch": "ResNet(50\u219264,4scales\u21926res\u2192pool\u2192128d) + Linear(128,32,1)",
+  "samples": 2055,
+  "best_val_acc": 0.5682,
+  "input_shape": [
+    50,
+    60
+  ],
+  "output_dim": 128
+}

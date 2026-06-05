@@ -1,26 +1,18 @@
-# BTC-USDT-SWAP 5m Market Config
-# Overrides: config/v8.yaml baseline
-
-inst_id: BTC-USDT-SWAP
 bar_seconds: 300
 dry_run: true
-okx_demo: true
-
-# BTC-specific gating thresholds
 gating:
-  min_depth_10: 8.0           # BTC 深度更大，阈值提高
-  max_spread_bps: 5.0         # BTC 流动性更好，点差更严格
-  max_realized_vol: 0.03
-  min_realized_vol: 0.00001
+  cs_min_pct: 0.12
   funding_blackout_min: 30
-  min_confidence: 0.55
+  max_realized_vol: 0.03
+  max_spread_bps: 5.0
   max_uncertainty: 0.05
-
-# BTC-specific risk
-risk:
-  max_position_pct: 0.5       # BTC 单笔仓位
-  max_daily_loss_pct: 0.03
-  kelly_fraction: 0.25
-
-# Logging
+  min_confidence: 0.55
+  min_depth_10: 0.5
+  min_realized_vol: 1.0e-05
+inst_id: BTC-USDT-SWAP
 log_level: INFO
+okx_demo: true
+risk:
+  kelly_fraction: 0.25
+  max_daily_loss_pct: 0.03
+  max_position_pct: 0.5

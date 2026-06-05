@@ -1,5 +1,5 @@
 """
-alpha/crypto/obi_v2.py �?Task 4: 经验 OBI/OFI 信号引擎
+alpha/crypto/obi_v2.py —Task 4: 经验 OBI/OFI 信号引擎
 ====================================================
 
 Computes Order-Book-Imbalance (OBI) and Order-Flow-Imbalance (OFI) from the

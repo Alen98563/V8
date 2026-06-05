@@ -42,6 +42,7 @@ class V8Config:
     triton_url: str = "localhost:8001"
     log_level: str = "INFO"
     dry_run: bool = True
+    initial_capital: float = 10000.0  # 初始资金 USDT
     okx: OkxCreds = field(default_factory=OkxCreds)
     okx_demo: bool = True  # 是否使用模拟盘
     gating: dict[str, Any] = field(default_factory=dict)
@@ -80,6 +81,7 @@ def load_config(path: Optional[str] = None) -> V8Config:
         triton_url=os.getenv("V8_TRITON_URL", data.get("triton_url", "localhost:8001")),
         log_level=os.getenv("V8_LOG_LEVEL", data.get("log_level", "INFO")),
         dry_run=_as_bool(os.getenv("V8_DRY_RUN", data.get("dry_run", True))),
+        initial_capital=float(data.get("initial_capital", 10000)),
         okx_demo=okx_demo,
         gating=data.get("gating", {}) or {},
         raw=data,

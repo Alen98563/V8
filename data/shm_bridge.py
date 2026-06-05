@@ -37,8 +37,12 @@ class ShmReader:
     """
 
     def __init__(self, inst_id: str = "BTC-USDT-SWAP") -> None:
-        self._bridge = ShmBridge(inst_id)
         self._native = is_native()
+        if self._native:
+            self._bridge = ShmBridge()  # native: PyO3 ctor takes 0 args
+        else:
+            self._bridge = ShmBridge(inst_id)  # fallback accepts inst_id
+        
         _log.info("shm_bridge_open", extra={"native": self._native, "inst_id": self.inst_id})
 
     # ----- write side (used by feature pump / tests) -------------------------
@@ -49,6 +53,7 @@ class ShmReader:
     def window_tensor(self, secs: int = 60) -> Any:
         """Return the recent window as a torch tensor (zero-copy on native)."""
         cap = self._bridge.get_window(secs)
+        self._native = is_native()
         if self._native:
             import torch
 
@@ -71,6 +76,7 @@ class ShmReader:
         ptr, (rows, cols) = self._bridge.get_raw_ptr(secs)
         if rows == 0 or cols == 0:
             return np.zeros((0, cols), dtype=np.float32)
+        self._native = is_native()
         if self._native:
             # Wrap Rust-owned memory: build a ctypes array over the address,
             # then np.frombuffer -> reshape. No element copy.

@@ -1,0 +1,12 @@
+{
+  "model_params": 651336,
+  "test_accuracy": 0.12142857164144516,
+  "best_val_loss": 0.2416338175535202,
+  "epochs_trained": 19,
+  "train_time_sec": 297.0,
+  "test_correct_long": 0,
+  "test_correct_short": 51,
+  "test_pred_long": 369,
+  "test_pred_short": 51,
+  "total_sequences": 2794
+}

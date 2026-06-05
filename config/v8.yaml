@@ -39,7 +39,7 @@ gating:
   meta_min_proba: 0.50         # MetaLabeler 预测概率阈值
 
   # G5 时间门控 - 资金费率结算黑名单窗口
-  funding_blackout_min: 30     # 资金费率结算前 N 分钟内禁止新开仓（OKX 每 8 小时结算：00/08/16 UTC）
+  funding_blackout_min: 5     # 资金费率结算前 N 分钟内禁止新开仓（OKX 每 8 小时结算：00/08/16 UTC）
 
   # AlphaCast 模型置信度阈值
   min_confidence: 0.55         # 最小置信度（低于此值不触发信号）

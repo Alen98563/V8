@@ -1,9 +1,9 @@
 """
-execution/settlement/pnl_aggregator.py �?Task 6: 实时对账 + P&L 结算
+execution/settlement/pnl_aggregator.py —Task 6: 实时对账 + P&L 结算
 ================================================================
 
 Tracks fills, reconstructs realized/unrealized P&L, slippage error, and a
-rolling Sharpe trend. Implements the "�?50 笔成交触发一次在�?Temperature
+rolling Sharpe trend. Implements the "�?50 笔成交触发一次在�?Temperature
 Scaling" scheduler hook: when ``fill_count % 50 == 0`` it fires a callback so the
 orchestrator can recalibrate AlphaCast confidence.
 """
@@ -44,6 +44,8 @@ class PnlSnapshot:
     slippage_bps_mean: float
     sharpe: float
     last_px: float
+    mae: float = 0.0
+    mfe: float = 0.0
 
 
 class PnlAggregator:
@@ -65,6 +67,9 @@ class PnlAggregator:
         self._equity_curve: Deque[float] = deque(maxlen=sharpe_window)
         self._on_recalibrate = on_recalibrate
         self._recal_every = recalibrate_every
+        self._mae = 0.0
+        self._mfe = 0.0
+        self._ref_entry = 0.0
 
     def on_fill(self, fill: Fill) -> PnlSnapshot:
         signed = fill.fill_sz if fill.side == "buy" else -fill.fill_sz
@@ -81,27 +86,39 @@ class PnlAggregator:
         new_pos = prev_pos + signed
 
         if prev_pos == 0 or (prev_pos > 0) == (signed > 0):
-            # opening or increasing �?weighted avg entry
+            # opening or increasing �?weighted avg entry
             if new_pos != 0:
                 self.avg_entry = (
                     abs(prev_pos) * self.avg_entry + abs(signed) * fill.fill_px
                 ) / (abs(prev_pos) + abs(signed))
         else:
-            # reducing or flipping �?realize against avg_entry
+            # reducing or flipping �?realize against avg_entry
             closed = min(abs(signed), abs(prev_pos))
             direction = 1.0 if prev_pos > 0 else -1.0
             self.realized += direction * (fill.fill_px - self.avg_entry) * closed
             if (prev_pos > 0) != (new_pos > 0) and new_pos != 0:
-                # flipped �?new entry at fill px
+                # flipped �?new entry at fill px
                 self.avg_entry = fill.fill_px
             elif new_pos == 0:
                 self.avg_entry = 0.0
 
         self.position = new_pos
         self.fill_count += 1
+
+        # ── MAE/MFE tracking ──
+        if prev_pos == 0 and new_pos != 0:
+            self._mae = 0.0
+            self._mfe = 0.0
+            self._ref_entry = fill.fill_px
+        elif new_pos != 0:
+            floating = (fill.fill_px - self._ref_entry) * (1.0 if new_pos > 0 else -1.0) * abs(new_pos)
+            if floating < self._mae:
+                self._mae = floating
+            if floating > self._mfe:
+                self._mfe = floating
         self._equity_curve.append(self.realized - self.fees)
 
-        # scheduler hook: every N fills �?online temperature scaling
+        # scheduler hook: every N fills �?online temperature scaling
         if self._on_recalibrate and self.fill_count % self._recal_every == 0:
             try:
                 self._on_recalibrate(self.fill_count)
@@ -120,6 +137,8 @@ class PnlAggregator:
                 "sz": fill.fill_sz,
                 "realized": round(self.realized, 4),
                 "position": round(self.position, 6),
+                "mae": round(self._mae, 4),
+                "mfe": round(self._mfe, 4),
             },
         )
         return snap
@@ -157,6 +176,8 @@ class PnlAggregator:
             slippage_bps_mean=round(sum(slips) / len(slips), 4) if slips else 0.0,
             sharpe=round(self._sharpe(), 4),
             last_px=self.last_px,
+            mae=round(self._mae, 4),
+            mfe=round(self._mfe, 4),
         )
 
 

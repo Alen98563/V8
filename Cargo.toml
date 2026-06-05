@@ -34,8 +34,8 @@ path = "core/src/lib.rs"
 
 [dependencies]
 # PyO3 — Python C 扩展桥接
-# abi3-py312: 兼容 Python 3.12+；extension-module: 生成 .pyd 而非 .exe
-pyo3 = { version = "0.21", features = ["abi3-py312", "extension-module"] }
+# abi3-py310: 兼容 Python 3.12+；extension-module: 生成 .pyd 而非 .exe
+pyo3 = { version = "0.21", features = ["abi3-py310", "extension-module"] }
 
 # Tokio — 异步运行时 (MCTS 线程池 + OKX WS)
 tokio = { version = "1", features = ["full"] }

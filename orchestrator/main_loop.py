@@ -30,14 +30,17 @@ CLI:
 from __future__ import annotations
 
 import argparse
+from collections import deque
+import numpy as np
 import asyncio
 import json
 import signal
+import struct
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from common.config import V8Config, load_config
+from common.config import V8Config, load_config, _load_yaml, OkxCreds
 from common.engine import (
     FeatureEngine,
     MctsPool,
@@ -47,11 +50,19 @@ from common.engine import (
     backend,
 )
 from common.logging_setup import get_logger, get_trace, new_trace_id
+import os
+import redis as _redis_lib
 from data.shm_bridge import ShmReader
 from alpha.crypto.obi_v2 import ObiV2Engine
+from alpha.crypto.cross_reader import CrossSectionReader, CrossSectionSnapshot
+from models.resnet.resnet_inference import ResNetInference, FeatureFusion178
+from gating.cross_section import CrossSectionGate
+from alpha.crypto.counterfactual_labeler import CounterFactualLabeler
 from gating.hard_gating import GateContext, HardGating
 from harness.pipeline_v1 import Harness
+from execution.exit.exit_manager import ExitManager, ExitConfig
 from execution.channels.order_sender import OrderSender
+from execution.exchange.exchange_config import ExchangeConfig
 from execution.settlement.pnl_aggregator import Fill, PnlAggregator
 from orchestrator.alerting import Alerter
 
@@ -94,12 +105,55 @@ class Orchestrator:
         self.bar_seconds = self.cfg.bar_seconds
 
         # --- engine + IO seams (native .pyd or pure-Python fallback) ---------
-        self.ws = OkxWsClient(self.inst_id)
+        okx_demo = self.cfg.okx_demo
+        use_live_ws = os.getenv("V8_LIVE_WS", "0") == "1" or not okx_demo
+        if use_live_ws:
+            use_redis_feed = os.getenv("V8_REDIS_FEED", "0") == "1"
+            if use_redis_feed:
+                redis_feed_url = os.getenv("V8_REDIS_FEED_URL", "redis://:nfm_redis_2026@100.76.129.125:6379/0")
+                from adapters.redis_feed import RedisFeedClient
+                self.ws = RedisFeedClient(self.inst_id, redis_url=redis_feed_url)
+            else:
+                from adapters.okx_ws_live import LiveOkxWsClient
+                self.ws = LiveOkxWsClient(self.inst_id, demo=okx_demo)
+        else:
+            self.ws = OkxWsClient(self.inst_id)
         self.fe = FeatureEngine(self.inst_id)
         self.shm = ShmReader(self.inst_id)
 
         # --- alpha + risk ----------------------------------------------------
         self.alpha = ObiV2Engine(self.inst_id)
+
+        # --- cross-section (Plan B: reads unified /dev/shm/qts_cross_section) ----
+        _cross_ids_env = os.getenv("V8_CROSS_INST_IDS", "")
+        self._cross_ids = (
+            [iid.strip() for iid in _cross_ids_env.split(",") if iid.strip()]
+            if _cross_ids_env
+            else []
+        )
+        self.cross: Optional[CrossSectionReader] = (
+            CrossSectionReader(self._cross_ids) if self._cross_ids else None
+        )
+
+        # ── Redis connection pool (shared across all pulses) ──────────────
+        self._redis = _redis_lib.Redis(connection_pool=_redis_lib.ConnectionPool.from_url(
+            self.cfg.redis_url,
+            max_connections=10,
+            health_check_interval=30,
+            retry_on_timeout=True,
+        ))
+
+        # ── G3 cross-section gate (consumer of CrossSectionReader) ──────
+        _xg_cfg = self.cfg.gating.get("cross_section", {}) if self.cfg.gating else {}
+        self.xgate = CrossSectionGate(_xg_cfg) if self.cross is not None else None
+
+        # ── ResNet + FeatureFusion (Phase 2A): 50d⊕128d→178d ────────
+        self._feat_buffer = deque(maxlen=60)  # rolling 60-tick feature buffer
+        self._resnet = ResNetInference()
+        self._fusion = FeatureFusion178(alpha=0.45)
+
+        # ── CFL counterfactual labeler ──────────────────────────────────
+        self.cfl = CounterFactualLabeler(self.cfg.cfl if hasattr(self.cfg, 'cfl') else None)
         self.gating = HardGating(self.cfg.gating)
 
         # --- planning (MCTS) + model rollout ---------------------------------
@@ -117,6 +171,14 @@ class Orchestrator:
         self.sender = OrderSender(self.channel, dry_run=self.dry_run)
         self.pnl = PnlAggregator(on_recalibrate=self._on_recalibrate)
 
+        # --- exchange config ----------------------------------------------------
+        _xchg_cfg = self.cfg.raw.get("exchange", {})
+        self.xchg = ExchangeConfig(**_xchg_cfg)
+
+        # --- exit logic ---------------------------------------------------------
+        _exit_cfg = ExitConfig(**self.cfg.raw.get("exit", {}))
+        self.exit_mgr = ExitManager(_exit_cfg, self.xchg)
+
         # --- observability ---------------------------------------------------
         self.harness = Harness("v8_main")
         self.alerter = Alerter()
@@ -125,38 +187,19 @@ class Orchestrator:
         self._stop = asyncio.Event()
 
     # =======================================================================
-    # Rollout adapter for the MCTS planner.
+    # Rollout adapter for the MCTS planner (Phase 1: CPU momentum heuristic).
     # =======================================================================
     def _rollout_fn(self, features_50d: bytes):
-        """Build a sync rollout_fn(state_bytes)->bytes for MctsPool.run_sync.
+        """Build sync rollout_fn(state_bytes)->bytes for MctsPool.run_sync.
 
-        On native + Triton we hand MCTS the AlphaCast client. Until that path is
-        wired (Phase 2), use a deterministic momentum/vol heuristic over the live
-        50d feature vector so the planner produces real, non-degenerate EV.
+        Phase 1: momentum/trend + controlled Gaussian noise over live 50d
+        features. Every rollout independently samples noise → differentiated
+        returns so MCTS UCB1 tree search explores meaningfully.
+
+        See models/mcts/rollout_v1.py for the full implementation.
         """
-
-        import struct
-
-        def _rollout(_state_bytes: bytes) -> bytes:
-            feats = list(struct.unpack(f"<{len(features_50d)//4}f", features_50d)) if features_50d else []
-            momentum = feats[5] if len(feats) > 5 else 0.0     # mean return proxy
-            vol = feats[6] if len(feats) > 6 else 0.0           # realized vol proxy
-            last_ret = feats[7] if len(feats) > 7 else 0.0
-            # predicted_return: momentum nudged by last tick, damped by vol
-            denom = 1.0 + 50.0 * abs(vol)
-            predicted = (0.7 * momentum + 0.3 * last_ret) / denom
-            confidence = max(0.0, min(1.0, 1.0 - 20.0 * vol))
-            uncertainty = min(0.2, vol)
-            return json.dumps(
-                {
-                    "predicted_return": predicted,
-                    "confidence": confidence,
-                    "uncertainty": uncertainty,
-                    "market_state": [momentum, vol, last_ret, 0.0],
-                }
-            ).encode("utf-8")
-
-        return _rollout
+        from models.mcts.rollout_v1 import rollout_v1  # ~4µs/rollout CPU
+        return rollout_v1
 
     def _on_recalibrate(self, fill_count: int) -> None:
         """Every 50 fills: hook for online AlphaCast temperature scaling."""
@@ -178,16 +221,50 @@ class Orchestrator:
         import struct
 
         feats_bytes = self.fe.get_features_50d()
-        feats = list(struct.unpack(f"<{len(feats_bytes)//4}f", feats_bytes))
-        self.shm.push(snap.get("ts_ms", int(time.time() * 1000)), feats)
+        if isinstance(feats_bytes, list):
+            feats = feats_bytes  # native: already a list of floats
+        else:
+            feats = list(struct.unpack(f"<{len(feats_bytes)//4}f", feats_bytes))
+        # native ShmBridge expects 50 features; truncate if we have 200
+        _push_feats = feats[:50] if len(feats) > 50 else feats
+        self.shm.push(snap.get("ts_ms", int(time.time() * 1000)), _push_feats)
+        # ── ResNet rolling buffer: accumulate 50d snapshots for 60-step window ──
+        self._feat_buffer.append(feats[:50])
+        # ── Redis IPC: publish snapshot for cross-section engine ──
+        try:
+            self._redis.setex(f"v8:snapshot:{self.inst_id}", 30, json.dumps(snap))
+        except Exception:
+            pass  # Redis optional — cross-section degrades gracefully
 
         # empirical alpha signal (OBI/OFI)
         sig = self.alpha.on_snapshot(snap)
+
+        # ── cross-section features (from CrossSectionEngine via Redis) ──
+        _xs = None
+        if self.cross is not None:
+            _xs = self.cross.latest()
+            if _xs is not None and len(_xs.inst_ids) > 1:
+                _other = _xs.inst_ids[1] if _xs.inst_ids[0] == self.inst_id else _xs.inst_ids[0]
+                _log.info(
+                    "cross_section",
+                    extra={
+                        "ts_ms": _xs.ts_ms,
+                        "delta_obi": round(_xs.delta_obi(self.inst_id, _other), 6),
+                        "lead_lag": round(_xs.lead_lag(self.inst_id, _other), 4),
+                    },
+                )
+
 
         self.state.ticks += 1
         self.state.last_px = float(snap.get("last_px", self.state.last_px))
         self.state.last_signal = sig.raw_signal
         self.state.last_confidence = sig.confidence
+
+        # ── CFL: track rolling ATR ─────────────────────────────────────
+        if self.cfl is not None:
+            self.cfl.on_tick(int(snap.get("ts_ms", time.time() * 1000)), self.inst_id,
+                             float(snap.get("last_px", 0)))
+
         return {"snap": snap, "signal": sig, "features": feats_bytes}
 
     # =======================================================================
@@ -207,12 +284,35 @@ class Orchestrator:
         )
         plan = json.loads(plan_bytes.decode("utf-8"))
         action = plan.get("best_action", "hold")
-        position = float(plan.get("best_position", 0.0))
+        position_frac = float(plan.get("best_position", 0.0))  # fraction of equity
         ev = float(plan.get("expected_value", 0.0))
+        _log.info("mcts_plan_dump", extra={"best_action": str(plan.get("best_action", "")), "best_position": str(plan.get("best_position", "")), "expected_value": str(plan.get("expected_value", "")), "visit_count": str(plan.get("visit_count", -1)), "pulse_id": pulse_id})
         self.state.last_action = action
 
-        if action == "hold" or position <= 0:
+        if action == "hold" or position_frac <= 0:
             _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev, "trace_id": get_trace()})
+            self.state.pulses = pulse_id
+            self.pnl.mark(self.state.last_px)
+            return
+
+        # Convert position fraction → contract size
+        px = float(last_snap.get("last_px", 0.0)) or 1.0
+        equity = self.cfg.initial_capital + self.pnl.realized + self.pnl.unrealized()
+        equity = max(equity, self.cfg.initial_capital * 0.1)
+        target_notional = equity * position_frac
+        sz = round(target_notional / px, 4)
+        max_sz = (equity * 0.05) / px
+        sz = min(sz, max_sz)
+        current_exposure = abs(self.pnl.position) * px
+        if current_exposure + sz * px > equity * 0.25:
+            _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev,
+                "reason": "max_exposure", "trace_id": get_trace()})
+            self.state.pulses = pulse_id
+            self.pnl.mark(self.state.last_px)
+            return
+        if sz < 0.001:
+            _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev,
+                "reason": "min_size", "trace_id": get_trace()})
             self.state.pulses = pulse_id
             self.pnl.mark(self.state.last_px)
             return
@@ -220,14 +320,54 @@ class Orchestrator:
         # ---- 2. HardGating G1–G5 (fail-closed) ------------------------------
         spread = float(last_snap.get("spread", 0.0))
         mid = float(last_snap.get("last_px", 0.0)) or 1.0
+
+        # ── compute G3 cs_composite from live cross-section data ─────────
+        cs_composite = 1.0   # default pass for single-asset
+        if self.xgate is not None and self.cross is not None:
+            _xs = self.cross.latest()
+            if _xs is not None and len(_xs.inst_ids) > 1:
+                _other = _xs.inst_ids[1] if _xs.inst_ids[0] == self.inst_id else _xs.inst_ids[0]
+                _s_self = float(last_snap.get("spread", 0.0))
+                _s_other = float(last_snap.get("spread_other", _s_self))  # approximate if unknown
+                _v_self = abs(self.state.last_signal) * 0.01
+                _v_other = _v_self  # approximate
+                _passed, _reason, cs_composite = self.xgate.evaluate(
+                    delta_obi=_xs.delta_obi(self.inst_id, _other),
+                    lead_lag=_xs.lead_lag(self.inst_id, _other),
+                    spread_self=_s_self,
+                    spread_other=_s_other,
+                    vol_self=_v_self,
+                    vol_other=_v_other,
+                )
+                if not _passed:
+                    _log.warning("g3_early_block", extra={"cs_composite": round(cs_composite, 4), "reason": _reason})
+
+        # ── ResNet 178d fusion (Phase 2A) ────────────────────────────
+        features_178d = None
+        if self._resnet.loaded and len(self._feat_buffer) >= 20:
+            try:
+                feat_mat = np.array(list(self._feat_buffer), dtype=np.float32).T  # [50, L]
+                if feat_mat.shape[1] < 60:
+                    pad = np.zeros((50, 60 - feat_mat.shape[1]), dtype=np.float32)
+                    feat_mat = np.concatenate([pad, feat_mat], axis=1)
+                elif feat_mat.shape[1] > 60:
+                    feat_mat = feat_mat[:, -60:]
+                deep_emb = self._resnet.encode(feat_mat)
+                emp_50 = list(struct.unpack(f"<{len(features_bytes)//4}f", features_bytes))[:50] if len(features_bytes) >= 200 else []
+                features_178d = self._fusion.fuse(emp_50, deep_emb.tolist() if deep_emb is not None else None)
+            except Exception as e:
+                _log.debug("resnet_fusion_skip", extra={"error": str(e)[:80]})
+
         ctx = GateContext(
             spread_bps=(spread / mid * 1e4) if mid else 0.0,
             bid_depth_10=float(last_snap.get("bid1_sz", 0.0)),
             ask_depth_10=float(last_snap.get("ask1_sz", 0.0)),
             realized_vol=abs(self.state.last_signal) * 0.01,
+            cs_composite=locals().get("cs_composite", 1.0),
             confidence=self.state.last_confidence,
             uncertainty=max(0.0, 1.0 - self.state.last_confidence) * 0.05,
             is_open_intent=True,
+            current_position=abs(self.state.position),
         )
         gate = self.harness.stage("gating", self.gating.evaluate, ctx)
         self.state.last_gate = gate.gate
@@ -241,7 +381,7 @@ class Orchestrator:
         # ---- 3. Execution: build UnifiedOrder, sign + send ------------------
         side = "buy" if action == "buy" else "sell"
         px = self.state.last_px
-        sz = round(position, 4)
+        # sz already computed above from position_frac
         cl_ord_id = new_trace_id("o")[:32]
         order = {
             "inst_id": self.inst_id,
@@ -259,13 +399,35 @@ class Orchestrator:
 
         # ---- 4. Settlement: book the fill -----------------------------------
         if str(receipt.get("code")) == "0" and receipt.get("state") == "FILLED":
+            # ── CFL: register new open for counterfactual tracking ──────
+            if self.cfl is not None:
+                _ts = int(last_snap.get("ts_ms", time.time() * 1000))
+                try:
+                    # Only unpack if features_bytes has 50 float32's (= 200 bytes)
+                    fbytes = features_bytes
+                    f50 = list(struct.unpack(f"<{len(fbytes)//4}f", fbytes)) if len(fbytes) >= 200 else []
+                    self.cfl.on_open(
+                        ts_ms=_ts, inst_id=self.inst_id,
+                        px=self.state.last_px,
+                        raw_signal=self.state.last_signal,
+                        confidence=self.state.last_confidence,
+                        direction=side,
+                        cs_composite=locals().get("cs_composite", 1.0),
+                        features_50d=f50[:50],
+                        features_178d=locals().get("features_178d"),
+                    )
+                except Exception as e:
+                    _log.warning("cfl_on_open_failed", extra={"error": str(e)[:120]})  # CFL is non-critical
+
+            _fill_px = float(receipt.get("fill_px", px))
+            _fill_sz = float(receipt.get("fill_sz", sz))
             fill = Fill(
                 trace_id=get_trace(),
                 cl_ord_id=cl_ord_id,
                 side=side,
-                fill_px=float(receipt.get("fill_px", px)),
-                fill_sz=float(receipt.get("fill_sz", sz)),
-                fee=float(receipt.get("fee", 0.0)),
+                fill_px=_fill_px,
+                fill_sz=_fill_sz,
+                fee=self.xchg.entry_fee(_fill_sz, _fill_px),
                 intended_px=px,
             )
             snap = self.harness.stage("settlement", self.pnl.on_fill, fill)
@@ -281,6 +443,16 @@ class Orchestrator:
         self.pnl.mark(self.state.last_px)
         self.state.unrealized_pnl = self.pnl.unrealized()
         self.state.pulses = pulse_id
+        # ── CFL: settle counterfactual labels ───────────────────────────
+        if self.cfl is not None:
+            try:
+                _px_map = {self.inst_id: self.state.last_px}
+                settled = self.cfl.settle_pending(int(last_snap.get("ts_ms", time.time() * 1000)), _px_map)
+                if settled:
+                    _log.info("cfl_settled_count", extra={"count": len(settled)})
+            except Exception as e:
+                _log.warning("cfl_settle_failed", extra={"error": str(e)[:120]})
+
         _log.info(
             "pulse_done",
             extra={
@@ -401,27 +573,131 @@ class Orchestrator:
         )
         plan = json.loads(plan_bytes.decode("utf-8"))
         action = plan.get("best_action", "hold")
-        position = float(plan.get("best_position", 0.0))
+        position_frac = float(plan.get("best_position", 0.0))  # fraction of equity
         ev = float(plan.get("expected_value", 0.0))
         self.state.last_action = action
 
-        if action == "hold" or position <= 0:
-            _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev, "trace_id": get_trace()})
-            self.state.pulses = pulse_id
-            self.pnl.mark(self.state.last_px)
-            return
+        # ---- Exit Logic (overrides MCTS when conditions trigger) ----------
+        is_exit = False
+        if self.pnl.position != 0:
+            px = float(last_snap.get("last_px", 0.0)) or 1.0
+            equity = self.cfg.initial_capital + self.pnl.realized + self.pnl.unrealized()
+            equity = max(equity, self.cfg.initial_capital * 0.1)
+            funding_rate = float(last_snap.get("funding_rate", 0.0))
+            exit_side, exit_sz, exit_reason = self.exit_mgr.check(
+                self.pnl.position, self.pnl.avg_entry,
+                self.pnl.unrealized(), px, equity, action,
+                funding_rate=funding_rate
+            )
+            if exit_side is not None:
+                action = exit_side
+                sz = exit_sz
+                is_exit = True
+                _log.info("exit_triggered", extra={
+                    "pulse_id": pulse_id, "side": exit_side,
+                    "sz": round(sz, 6), "position": round(self.pnl.position, 6),
+                    "upnl": round(self.pnl.unrealized(), 2),
+                    "trace_id": get_trace()
+                })
+
+        if not is_exit:
+            if action == "hold" or position_frac <= 0:
+                _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev, "trace_id": get_trace()})
+                self.state.pulses = pulse_id
+                self.pnl.mark(self.state.last_px)
+                return
+
+            # Convert position fraction → contract size
+            # position_frac = 0.05 means 5% of equity
+            px = float(last_snap.get("last_px", 0.0)) or 1.0
+            equity = self.cfg.initial_capital + self.pnl.realized + self.pnl.unrealized()
+            equity = max(equity, self.cfg.initial_capital * 0.1)  # floor at 10%
+            target_notional = equity * position_frac
+            sz = round(target_notional / px, 4)
+
+            # Hard limit: max 5% of equity per trade, max 25% total exposure
+            max_sz = (equity * 0.05) / px
+            sz = min(sz, max_sz)
+            current_exposure = abs(self.pnl.position) * px
+            # Only block if this trade INCREASES exposure (buy when long, sell when short)
+            is_increasing = (action == "buy" and self.pnl.position >= 0) or (action == "sell" and self.pnl.position <= 0)
+            if is_increasing and current_exposure + sz * px > equity * 0.25:
+                _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev,
+                    "reason": "max_exposure", "trace_id": get_trace()})
+                self.state.pulses = pulse_id
+                self.pnl.mark(self.state.last_px)
+                return
+
+            if sz < 0.001:  # min contract size
+                _log.info("pulse_hold", extra={"pulse_id": pulse_id, "ev": ev,
+                    "reason": "min_size", "trace_id": get_trace()})
+                self.state.pulses = pulse_id
+                self.pnl.mark(self.state.last_px)
+                return
 
         # ---- 2. HardGating G1–G5 --------------------------------------------
         spread = float(last_snap.get("spread", 0.0))
         mid = float(last_snap.get("last_px", 0.0)) or 1.0
+
+        # ── compute G3 cs_composite from live cross-section data ─────────
+        cs_composite = 1.0   # default pass for single-asset
+        if self.xgate is not None and self.cross is not None:
+            _xs = self.cross.latest()
+            if _xs is not None and len(_xs.inst_ids) > 1:
+                _other = _xs.inst_ids[1] if _xs.inst_ids[0] == self.inst_id else _xs.inst_ids[0]
+                _passed, _reason, cs_composite = self.xgate.evaluate(
+                    delta_obi=_xs.delta_obi(self.inst_id, _other),
+                    lead_lag=_xs.lead_lag(self.inst_id, _other),
+                    spread_self=float(last_snap.get("spread", 0.0)),
+                    spread_other=float(last_snap.get("spread", 0.0)),
+                    vol_self=abs(self.state.last_signal) * 0.01,
+                    vol_other=abs(self.state.last_signal) * 0.01,
+                )
+
+        # ── ResNet 178d fusion (Phase 2A, sync path) ─────────────────
+        features_178d = None
+        if self._resnet.loaded and len(self._feat_buffer) >= 20:
+            try:
+                import numpy as np
+                feat_mat = np.array(list(self._feat_buffer), dtype=np.float32).T
+                if feat_mat.shape[1] < 60:
+                    pad = np.zeros((50, 60 - feat_mat.shape[1]), dtype=np.float32)
+                    feat_mat = np.concatenate([pad, feat_mat], axis=1)
+                elif feat_mat.shape[1] > 60:
+                    feat_mat = feat_mat[:, -60:]
+                deep_emb = self._resnet.encode(feat_mat)
+                fbytes = features_bytes
+                emp_50 = list(struct.unpack(f"<{len(fbytes)//4}f", fbytes))[:50] if len(fbytes) >= 200 else []
+                features_178d = self._fusion.fuse(emp_50, deep_emb.tolist() if deep_emb is not None else None)
+            except Exception as e:
+                _log.debug("resnet_fusion_skip_sync", extra={"error": str(e)[:80]})
+
+        # ── Phase 5: save 50x60 feature window for ResNet fine-tuning ──
+        if len(self._feat_buffer) >= 60:
+            try:
+                import psycopg2
+                _b = list(self._feat_buffer)
+                _win = [list(row) for row in _b[-60:]]  # 60 × 50
+                conn = psycopg2.connect(dbname="v8_cfl", host="localhost")
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO v8_feature_windows (inst_id, ts_ms, window_data) VALUES (%s, %s, %s)",
+                    (self.inst_id, int(last_snap.get("ts_ms", 0)), json.dumps(_win))
+                )
+                conn.commit(); conn.close()
+            except Exception:
+                pass  # non-critical
+
         ctx = GateContext(
             spread_bps=(spread / mid * 1e4) if mid else 0.0,
             bid_depth_10=float(last_snap.get("bid1_sz", 0.0)),
             ask_depth_10=float(last_snap.get("ask1_sz", 0.0)),
             realized_vol=abs(self.state.last_signal) * 0.01,
+            cs_composite=locals().get("cs_composite", 1.0),
             confidence=self.state.last_confidence,
             uncertainty=max(0.0, 1.0 - self.state.last_confidence) * 0.05,
             is_open_intent=True,
+            current_position=abs(self.state.position),
         )
         gate = self.harness.stage("gating", self.gating.evaluate, ctx)
         self.state.last_gate = gate.gate
@@ -435,7 +711,7 @@ class Orchestrator:
         # ---- 3. Execution: build order, simulate fill (sync) -----------------
         side = "buy" if action == "buy" else "sell"
         px = self.state.last_px
-        sz = round(position, 4)
+        # sz already computed above from position_frac
         cl_ord_id = new_trace_id("o")[:32]
         order = {
             "inst_id": self.inst_id,
@@ -477,13 +753,35 @@ class Orchestrator:
 
         # ---- 4. Settlement ---------------------------------------------------
         if str(receipt.get("code")) == "0" and receipt.get("state") == "FILLED":
+            # ── CFL: register new open for counterfactual tracking ──────
+            if self.cfl is not None:
+                _ts = int(last_snap.get("ts_ms", time.time() * 1000))
+                try:
+                    # Only unpack if features_bytes has 50 float32's (= 200 bytes)
+                    fbytes = features_bytes
+                    f50 = list(struct.unpack(f"<{len(fbytes)//4}f", fbytes)) if len(fbytes) >= 200 else []
+                    self.cfl.on_open(
+                        ts_ms=_ts, inst_id=self.inst_id,
+                        px=self.state.last_px,
+                        raw_signal=self.state.last_signal,
+                        confidence=self.state.last_confidence,
+                        direction=side,
+                        cs_composite=locals().get("cs_composite", 1.0),
+                        features_50d=f50[:50],
+                        features_178d=locals().get("features_178d"),
+                    )
+                except Exception as e:
+                    _log.warning("cfl_on_open_failed", extra={"error": str(e)[:120]})  # CFL is non-critical
+
+            _fill_px = float(receipt.get("fill_px", px))
+            _fill_sz = float(receipt.get("fill_sz", sz))
             fill = Fill(
                 trace_id=get_trace(),
                 cl_ord_id=cl_ord_id,
                 side=side,
-                fill_px=float(receipt.get("fill_px", px)),
-                fill_sz=float(receipt.get("fill_sz", sz)),
-                fee=float(receipt.get("fee", 0.0)),
+                fill_px=_fill_px,
+                fill_sz=_fill_sz,
+                fee=self.xchg.entry_fee(_fill_sz, _fill_px),
                 intended_px=px,
             )
             snap = self.harness.stage("settlement", self.pnl.on_fill, fill)
@@ -499,6 +797,16 @@ class Orchestrator:
         self.pnl.mark(self.state.last_px)
         self.state.unrealized_pnl = self.pnl.unrealized()
         self.state.pulses = pulse_id
+        # ── CFL: settle counterfactual labels ───────────────────────────
+        if self.cfl is not None:
+            try:
+                _px_map = {self.inst_id: self.state.last_px}
+                settled = self.cfl.settle_pending(int(last_snap.get("ts_ms", time.time() * 1000)), _px_map)
+                if settled:
+                    _log.info("cfl_settled_count", extra={"count": len(settled)})
+            except Exception as e:
+                _log.warning("cfl_settle_failed", extra={"error": str(e)[:120]})
+
         _log.info(
             "pulse_done",
             extra={
@@ -637,3 +945,48 @@ def main(argv: Optional[list] = None) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def run_main_loop(config_path, base_config_path, inst_id, dry_run, max_pulses, tick_hz):
+    """CLI entry point used by orchestrator/main.py.
+
+    Loads base + market configs, merges them, then runs the
+    orchestrator in synchronous mode (no asyncio).
+    """
+    import os
+
+    # Merge base YAML + market YAML
+    base = _load_yaml(base_config_path)
+    market = _load_yaml(config_path)
+    merged = {**base, **market}
+    merged["inst_id"] = inst_id
+    merged["dry_run"] = dry_run
+
+    okx_demo = merged.get("okx_demo", True)
+    cfg = V8Config(
+        inst_id=inst_id,
+        bar_seconds=int(merged.get("bar_seconds", 300)),
+        redis_url=os.getenv("V8_REDIS_URL", merged.get("redis_url", "redis://127.0.0.1:6379/0")),
+        triton_url=os.getenv("V8_TRITON_URL", merged.get("triton_url", "localhost:8001")),
+        log_level=os.getenv("V8_LOG_LEVEL", merged.get("log_level", "INFO")),
+        dry_run=dry_run,
+        okx_demo=okx_demo,
+        gating=merged.get("gating", {}) or {},
+        raw=merged,
+    )
+    cfg.okx = OkxCreds(
+        api_key=os.getenv("OKX_DEMO_API_KEY", os.getenv("OKX_API_KEY", "")),
+        secret_key=os.getenv("OKX_DEMO_SECRET_KEY", os.getenv("OKX_SECRET_KEY", "")),
+        passphrase=os.getenv("OKX_DEMO_PASSPHRASE", os.getenv("OKX_PASSPHRASE", "")),
+        is_demo=True,
+    )
+
+    _log.info(
+        "run_main_loop",
+        extra={"inst_id": inst_id, "dry_run": dry_run, "config": config_path},
+    )
+
+    orch = Orchestrator(cfg)
+    state = orch.run_sync(max_pulses=max_pulses, tick_hz=tick_hz)
+    print(json.dumps(state.as_dict(), indent=2, ensure_ascii=False))
+    return state

@@ -49,7 +49,7 @@ mkdir -p "$MARKET_DIR/logs"
 cd "$REPO_DIR"
 
 log "Starting $MARKET (inst_id=$INST_ID $DRY_RUN)..."
-nohup python3 -m orchestrator.main \
+nohup /home/jerry/V8/.venv/bin/python3 -m orchestrator.main \
     --config "$MARKET_CONFIG" \
     --base-config config/v8.yaml \
     --inst-id "$INST_ID" \

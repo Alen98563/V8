@@ -597,8 +597,13 @@ impl MctsPool {
                     .unwrap_or(0.0);
 
                 let result = serde_json::json!({
-                    "best_action": format!("{:?}", best_action),
-                    "best_position": format!("{:?}", best_pos),
+                    "best_action": match best_action {
+                    Action::Buy => "buy",
+                    Action::Sell => "sell",
+                    Action::Hold => "hold",
+                    Action::Close => "close",
+                },
+                    "best_position": best_pos.as_f64(),
                     "expected_value": ev,
                     "path_value": ev,
                     "sharpe_estimate": 0.0,

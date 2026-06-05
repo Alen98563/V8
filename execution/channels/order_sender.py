@@ -1,8 +1,8 @@
 """
-execution/channels/order_sender.py â€?async sender for OkxChannel signed requests
+execution/channels/order_sender.py â€”async sender for OkxChannel signed requests
 =================================================================================
 
-DeepSeek's ``OkxChannel`` (Rust) only *signs* and returns request JSON bytes â€?it never touches the network (to avoid nesting an async runtime inside Python's
+DeepSeek's ``OkxChannel`` (Rust) only *signs* and returns request JSON bytes â€”it never touches the network (to avoid nesting an async runtime inside Python's
 loop). This module takes that signed request and actually sends it via httpx,
 keeping the FSM in step.
 

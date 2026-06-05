@@ -1,0 +1,8 @@
+{
+  "trained_at": "2026-06-01T08:52:45.311707",
+  "task": "value_regression",
+  "arch": "50d\u219264\u219232\u21921 (softplus)",
+  "samples": 9650,
+  "r2": -0.0022,
+  "calibration_buckets": 1
+}

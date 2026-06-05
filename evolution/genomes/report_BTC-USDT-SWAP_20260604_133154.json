@@ -1,0 +1,8 @@
+{
+  "instrument": "BTC-USDT-SWAP",
+  "bar_count": 33,
+  "bar_ms": 300000,
+  "days": 2,
+  "strategies": [],
+  "timestamp": "2026-06-04T13:31:54.006592+00:00"
+}

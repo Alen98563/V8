@@ -6,11 +6,10 @@ build-backend = "maturin"
 name = "qts-v8"
 version = "0.1.0"
 description = "QTS V8 — Multi-Asset Hybrid Quant Trading System"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-python-source = "python"
 module-name = "v8_core_engine"
 
 [tool.uv]
