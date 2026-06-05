@@ -110,7 +110,7 @@ class Orchestrator:
         if use_live_ws:
             use_redis_feed = os.getenv("V8_REDIS_FEED", "0") == "1"
             if use_redis_feed:
-                redis_feed_url = os.getenv("V8_REDIS_FEED_URL", "redis://:nfm_redis_2026@100.76.129.125:6379/0")
+                redis_feed_url = os.getenv("V8_REDIS_FEED_URL", "redis://localhost:6379/0")
                 from adapters.redis_feed import RedisFeedClient
                 self.ws = RedisFeedClient(self.inst_id, redis_url=redis_feed_url)
             else:

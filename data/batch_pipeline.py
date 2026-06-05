@@ -5,13 +5,13 @@ Usage: python3 batch_pipeline.py --data-dir /home/jerry/V8/data
 Processes ALL instruments in ticks_db/ directory.
 """
 
-import argparse, os, sys, subprocess
+import argparse, os, shlex, sys, subprocess
 from pathlib import Path
 
 def run(cmd, desc):
     print(f"\n[{desc}]")
     print(f"  $ {cmd[:120]}...")
-    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    r = subprocess.run(shlex.split(cmd), shell=False, capture_output=True, text=True)
     if r.returncode != 0:
         print(f"  ERROR: {r.stderr[:300]}")
     else:

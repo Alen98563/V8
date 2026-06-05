@@ -52,3 +52,5 @@ schemas/*.pyi
 # Runtime artifacts
 *.pid
 .cross_section.pid
+*.bak
+*.bak_*

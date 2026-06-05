@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 # — config —
-REDIS_URL = os.environ.get("V8_REDIS_URL", "redis://:nfm_redis_2026@100.76.129.125:6379/0")
+REDIS_URL = os.environ.get("V8_REDIS_URL", "redis://localhost:6379/0")
 DATA_DIR = Path(os.environ.get("V8_DATA_DIR", os.path.dirname(os.path.abspath(__file__)))) / "ticks_db"
 
 # 20-field tick schema

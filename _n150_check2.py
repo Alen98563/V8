@@ -1,9 +1,10 @@
 """Check cargo/rust availability on N150 and install if needed."""
+import os
 import paramiko
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('100.124.230.63', username='jerry', password='i982030i', timeout=15)
+client.connect(os.getenv('N150_HOST', '100.124.230.63'), username=os.getenv('N150_USER', 'jerry'), password=os.getenv('N150_PASS', ''), timeout=15)
 
 cmds = [
     # Check common cargo locations

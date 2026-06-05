@@ -1,10 +1,12 @@
 """Check V8 project status on N150."""
+import os
+import os
 import paramiko
 import sys
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('100.124.230.63', username='jerry', password='i982030i', timeout=15)
+client.connect(os.getenv('N150_HOST', '100.124.230.63'), username=os.getenv('N150_USER', 'jerry'), password=os.getenv('N150_PASS', ''), timeout=15)
 
 cmds = [
     # 1. Check if V8 project directory exists

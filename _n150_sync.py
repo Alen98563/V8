@@ -34,7 +34,7 @@ print(f"    Tarball: {TAR_PATH} ({size_mb:.1f} MB)")
 print("[2/4] Uploading to N150...")
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('100.124.230.63', username='jerry', password='i982030i', timeout=15)
+client.connect(os.getenv('N150_HOST', '100.124.230.63'), username=os.getenv('N150_USER', 'jerry'), password=os.getenv('N150_PASS', ''), timeout=15)
 
 remote_tar = "/home/jerry/v8_sync.tar.gz"
 sftp = client.open_sftp()

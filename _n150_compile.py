@@ -1,4 +1,6 @@
 """Fix PATH and install deps, then compile on N150."""
+import os
+import os
 import paramiko
 import sys
 import io
@@ -7,7 +9,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('100.124.230.63', username='jerry', password='i982030i', timeout=15)
+client.connect(os.getenv('N150_HOST', '100.124.230.63'), username=os.getenv('N150_USER', 'jerry'), password=os.getenv('N150_PASS', ''), timeout=15)
 
 def run(cmd, timeout=120, label=""):
     print(f"\n{'='*60}")

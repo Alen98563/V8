@@ -11,7 +11,7 @@ zero plumbing changes: ``start()``, ``stop()``, ``latest_snapshot()``.
 
 Usage::
 
-    ws = RedisFeedClient("BTC-USDT-SWAP", redis_url="redis://:pass@100.76.129.125:6379/0")
+    ws = RedisFeedClient("BTC-USDT-SWAP", redis_url=os.getenv("V8_REDIS_FEED_URL", "redis://localhost:6379/0"))
     ws.start()            # no-op (stateless — Redis handles persistence)
     snap = ws.latest_snapshot()  # JSON string or None
     ws.stop()             # no-op
@@ -30,14 +30,14 @@ class RedisFeedClient:
     """Synchronous Redis reader that looks like a WebSocket client."""
 
     def __init__(self, inst_id: str = "BTC-USDT-SWAP", redis_url: str = "") -> None:
+        import os as _os
         self.inst_id = inst_id
         self._running = True
         self._key = f"v8:snapshot:{inst_id}"
 
-        if redis_url:
-            self._redis = _redis_lib.Redis.from_url(redis_url, socket_connect_timeout=5, socket_timeout=5, decode_responses=True)
-        else:
-            self._redis = _redis_lib.Redis(host="100.76.129.125", port=6379, password="nfm_redis_2026", socket_connect_timeout=5, socket_timeout=5, decode_responses=True)
+        if not redis_url:
+            redis_url = _os.getenv("V8_REDIS_FEED_URL", "redis://localhost:6379/0")
+        self._redis = _redis_lib.Redis.from_url(redis_url, socket_connect_timeout=5, socket_timeout=5, decode_responses=True)
         self._redis.ping()
 
     def start(self) -> None:
